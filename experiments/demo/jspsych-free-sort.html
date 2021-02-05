@@ -8,10 +8,19 @@
   </head>
   <body></body>
   <script>
+	  
+	  var image_num=20;
+	  var stimuli_1=[];
+	  var stimuli_2=[];
+	  
+	  for (i =0;i++;i<image_num) {
+		  stimuli_1.push("stimuli/AF01_NeutralHappy/AF01_NHMorph"+i+".png");
+		  stimuli_2.push("stimuli/BF03_NeutralAngry/BF03 NeutraltoAngry"+i+".png");
+	  }
 
   var trial_1 = {
     type: 'free-sort',
-    stimuli: ['img/happy_face_1.jpg','img/happy_face_3.jpg','img/sad_face_2.jpg','img/sad_face_4.jpg'],
+    stimuli: stimuli_1,
     stim_height: 150,
     stim_width: 200,
     prompt: 'Please group similar expressions together. '
@@ -19,7 +28,7 @@
 
   var trial_2 = {
     type: 'free-sort',
-    stimuli: ['img/happy_face_1.jpg','img/happy_face_3.jpg','img/sad_face_2.jpg','img/sad_face_4.jpg'],
+    stimuli: stimuli_2,
     stim_height: 120,
     stim_width: 160,
     prompt: '<p>Arrange the faces.</p>',
@@ -32,63 +41,8 @@
     border_color_out: 'red'
   };
 
-  var trial_3 = {
-    type: 'canvas-keyboard-response',
-    stimulus: function(c) {
-      c.style.border = "5px solid #A9A9A9";
-      // present images on a canvas at specific locations
-      var ctx = c.getContext('2d');
-      var img1 = new Image();
-      var img2 = new Image();
-      var img3 = new Image();
-      img1.src = 'img/1.gif';
-      img2.src = 'img/2.gif';
-      img3.src = 'img/3.gif';
-      img1.addEventListener('load', function() {
-        ctx.drawImage(img1, 0, 0, 90, 90);
-      }, false);
-      img2.addEventListener('load', function() {
-        ctx.drawImage(img2, 500, 600,  90, 90);
-      }, false);
-      img3.addEventListener('load', function() {
-        ctx.drawImage(img3, 300, 100,  90, 90);
-      }, false);
-    },
-    canvas_size: [700,700],
-    prompt: "Memorize the image locations (5s).",
-    choices: jsPsych.NO_KEYS,
-    trial_duration: 5000
-  };
-
-  var trial_4 = {
-    type: 'free-sort',
-    stimuli: ['img/1.gif','img/2.gif','img/3.gif'],
-    stim_height: 90,
-    stim_width: 90,
-    scale_factor: 1.0,
-    prompt: '<p>Where were the images?</p>',
-    prompt_location: 'below',
-    sort_area_shape: "square",
-    change_border_background_color: false,
-    border_width: 5,
-    counter_text_unfinished: "Not done yet...",
-    counter_text_finished: "Done!"
-  };
-
-  var trial_5 = {
-    type: 'free-sort',
-    stimuli: ['img/4.gif','img/5.gif','img/6.gif'],
-    prompt: '<p>Arrange the images.</p><p>Images start at random locations inside the sort area.</p>',
-    change_border_background_color: false,
-    border_width: 3,
-    counter_text_unfinished: "",
-    counter_text_finished: "",
-    stim_starts_inside: true,
-    sort_area_shape: "square"
-  };
-
   jsPsych.init({
-    timeline: [trial_1, trial_2, trial_3, trial_4, trial_5],
+    timeline: [trial_1, trial_2],
     on_finish: function(){jsPsych.data.displayData();}
   });
 
