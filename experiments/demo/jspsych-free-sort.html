@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <script src="../jspsych.js"></script>
-    <script src="../plugins/jspsych-free-sort.js"></script>
-    <script src="../plugins/jspsych-canvas-keyboard-response.js"></script>
-    <link rel="stylesheet" href="../css/jspsych.css">
+    <script src="jspsych-6.2.0/jspsych.js"></script>
+    <script src="jspsych-6.2.0/plugins/jspsych-free-sort.js"></script>
+    <script src="jspsych-6.2.0/plugins/jspsych-canvas-keyboard-response.js"></script>
+    <link rel="stylesheet" href="jspsych-6.2.0/css/jspsych.css">
   </head>
   <body></body>
   <script>
@@ -13,10 +13,12 @@
 	  var stimuli_1=[];
 	  var stimuli_2=[];
 	  
-	  for (i =0;i++;i<image_num) {
+	  for (i =0;i<image_num;i++) {
 		  stimuli_1.push("stimuli/AF01_NeutralHappy/AF01_NHMorph"+i+".png");
-		  stimuli_2.push("stimuli/BF03_NeutralAngry/BF03 NeutraltoAngry"+i+".png");
+		  stimuli_2.push("stimuli/BF03 NeutralAngry/BF03 NeutraltoAngry"+i+".png");
 	  }
+	  
+	  console.log(stimuli_1);
 
   var trial_1 = {
     type: 'free-sort',
