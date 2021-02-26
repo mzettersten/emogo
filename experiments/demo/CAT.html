@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>CAT TEST</title>
+    <script src="jspsych-6.1.0/jspsych.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-html-keyboard-response.js"></script>
+	<script src="jspsych-6.1.0/plugins/jspsych-image-keyboard-response.js"></script>
+	<script src="jspsych-6.1.0/plugins/jspsych-fullscreen.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-visual-search-circle.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-vsl-animate-occlusion.js"></script>
+	<script src="jspsych-6.1.0/plugins/jspsych-survey-text.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-html-button-response.js"></script>
+    <script src="jspsych-6.1.0/plugins/jspsych-image-button-response.js"></script>
+	
+    <link href="jspsych-6.1.0/css/jspsych.css" rel="stylesheet" type="text/css"></link>
+	<style>
+		body {background-color: White;}
+		</style>
+  </head>
+  <body>
+	      <div id="jspsych-target"></div>
+  </body>
+	
+  <script>
+
+
+/* to do */
+	  /*demographics
+option to delete data?
+conditional for practice
+seed
+room counterbalance
+versions for happy vs angry
+survey
+extra block
+testing (and randomization)*/
+
+
+
+    /* create timeline */
+    var timeline = [];
+	
+	/* enter fullscreen mode */
+	/*timeline.push({
+	  type: 'fullscreen',
+	  fullscreen_mode: true
+	});*/
+		
+	/*assign a random id number*/
+	var id = jsPsych.randomization.randomID(8);
+	var i = 0;
+	
+	var maleArray = ['20','21','22','23','25','26','27','28','29','30','31'];
+	var shuffledMale = jsPsych.randomization.shuffle(maleArray);
+	var maleOne = shuffledMale[0];
+	var maleTwo = shuffledMale[1];
+	var maleThree = shuffledMale[2];
+	
+	
+	var femaleArray = ['01','02','03','05','06','07','08','09','10','13','17'];
+	var shuffledFemale = jsPsych.randomization.shuffle(femaleArray);
+	var femaleOne = shuffledFemale[0];
+	var femaleTwo = shuffledFemale[1];
+	var femaleThree = shuffledFemale[2];
+	
+	var morphCalmArray = ['20', '25', '30', '35', '40', '45'];
+	var shuffledCalm = jsPsych.randomization.shuffle(morphCalmArray);
+	
+	var morphAngryArray = ['55', '60', '65', '70', '75', '80'];
+	var shuffledAngry = jsPsych.randomization.shuffle(morphAngryArray);	
+		
+	// can add happy emotion later
+	var emotionArray = ['angry'];
+	var shuffledEmotion = jsPsych.randomization.shuffle(emotionArray);
+	var emotion = shuffledEmotion[0];
+
+	/* instructions */
+	var instructions = {
+	    type: 'html-button-response',
+	    stimulus: "<p style='font-size: 28px'>Sometimes people feel upset and sometimes they feel calm.</p><p style='font-size: 28px'>Today we will show you faces and need your help figuring out if they are upset or calm.</p>",
+		choices: ["Continue"],
+	  	response_ends_trial: true
+	};
+    timeline.push(instructions);
+	
+	var redRoom = {
+	    type: 'image-button-response',
+	    stimulus: 'cat_images/redRoom.JPG',
+		prompt: "<p style='font-size: 28px'>When people are feeling upset they like to go to the RED room and practice boxing.</p>",
+		choices: ["Continue"],
+	  	response_ends_trial: true
+	};
+    timeline.push(redRoom);
+	
+	var blueRoom = {
+	    type: 'image-button-response',
+	    stimulus: 'cat_images/blueRoom.JPG',
+		prompt: "<p style='font-size: 28px'>When people are feeling calm they like to go to the BLUE room and read a book.</p>",
+		choices: ["Continue"],
+	  	response_ends_trial: true
+	};
+    timeline.push(blueRoom);
+	
+	var instructionsSum = {
+	    type: 'html-button-response',
+	    stimulus: "<p style='font-size: 28px'>We need you to help us figure out what room everyone should go to.</p><p style='font-size: 28px'>If you think people are feeling upset, click the RED room to put them in the RED room.</p><p style='font-size: 28px'>If you think people are feeling calm, click the BLUE room to put them in the BLUE room.</p>",
+		choices: ["Continue"],
+	  	response_ends_trial: true
+	};
+    timeline.push(instructionsSum);
+	
+	/*practice*/
+	var practice = {
+		timeline: [
+
+			{
+				type: 'image-button-response',
+	      	  	stimulus: jsPsych.timelineVariable('image'),
+	      	  	choices: ['left', 'right'],
+				margin_horizontal: '150px',
+				response_ends_trial: true, 
+				data: {
+					stimulus_type: [jsPsych.timelineVariable('stimulus_type')],
+					corr_resp: [jsPsych.timelineVariable('corr_resp')],
+					percent: [jsPsych.timelineVariable('percent_morph')],
+					model_gen: [jsPsych.timelineVariable('model_gender')],
+					model_num: [jsPsych.timelineVariable('model')],
+					block: 'training'
+					  },
+		        button_html: [
+		            '<img src="cat_images/redRoom.JPG" height="219px" width="219px"/>',
+					'<img src="cat_images/blueRoom.JPG" height="219px" width="219px"/>'
+		        ],
+				on_finish: function(data){
+				    if(data.button_pressed == data.corr_resp){// 0 is left
+				      data.correct = true; // can add property correct by modify data object directly
+				    } else {
+				      data.correct = false;
+				    }
+
+				  }
+			},
+			
+			{
+			  type: 'html-keyboard-response',
+			  trial_duration: 800,
+			  stimulus: function(){
+			    var last_trial_correct = jsPsych.data.get().last(1).values()[0].correct;
+			    if(last_trial_correct){
+			      return "<p style='font-size: 36px'>Correct!</p>";
+			    } else {
+			      return "<p style='font-size: 36px'>Incorrect.</p>"
+			    }
+			  }
+		      
+			},
+		    
+		],
+		
+		timeline_variables: [
+			{image: ['cat_images/0'+emotion+femaleOne+'.JPG'], 
+			percent_morph: 0,
+			model_gender: "female",
+			model: femaleOne,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/0'+emotion+femaleTwo+'.JPG'], 
+			percent_morph: 0,
+			model_gender: "female",
+			model: femaleTwo,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/0'+emotion+maleOne+'.JPG'], 
+			percent_morph: 0,
+			model_gender: "male",
+			model: maleOne,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/0'+emotion+maleTwo+'.JPG'], 
+			percent_morph: 0,
+			model_gender: "male",
+			model: maleTwo,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/100'+emotion+femaleOne+'.JPG'], 
+			percent_morph: 100,
+			model_gender: "female",
+			model: femaleOne,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/100'+emotion+femaleTwo+'.JPG'], 
+			percent_morph: 100,
+			model_gender: "female",
+			model: femaleTwo,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/100'+emotion+maleOne+'.JPG'], 
+			percent_morph: 100,
+			model_gender: "male",
+			model: maleOne,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/100'+emotion+maleTwo+'.JPG'], 
+			percent_morph: 100,
+			model_gender: "male",
+			model: maleTwo,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			
+		],
+    	randomize_order: true,
+	
+	};
+    timeline.push(practice);
+	
+	
+	
+	
+	var instructionsAss = {
+	    type: 'html-button-response',
+	    stimulus: "<p style='font-size: 28px'>Now it will be up to you to decide how everyone is feeling.</p><p style='font-size: 28px'>If you think they are feeling CALM, indicate they want to go to the BLUE room.</p><p style='font-size: 28px'>If you think they are feeling UPSET, indicate they want to go to the RED room.</p>",
+		choices: ["Continue"],
+	  	response_ends_trial: true
+	};
+    timeline.push(instructionsAss);
+	
+	
+	/*assessment*/
+	for(var i=0; i<6; i++){
+	var test = {
+		timeline: [
+
+			{
+				type: 'html-keyboard-response',
+				stimulus: ' ',
+				choices: jsPsych.NO_KEYS,
+				trial_duration: 100
+			},
+			{
+				type: 'image-button-response',
+	      	  	stimulus: jsPsych.timelineVariable('image'),
+	      	  	choices: ['left', 'right'],
+				margin_horizontal: '150px',
+				response_ends_trial: true, 
+				data: {
+					stimulus_type: [jsPsych.timelineVariable('stimulus_type')],
+					corr_resp: [jsPsych.timelineVariable('corr_resp')],
+					percent: [jsPsych.timelineVariable('percent_morph')],
+					model_gen: [jsPsych.timelineVariable('model_gender')],
+					model_num: [jsPsych.timelineVariable('model')],
+					block: 'assessment'
+					  },
+		        button_html: [
+		            '<img src="cat_images/redRoom.JPG" height="219px" width="219px"/>',
+					'<img src="cat_images/blueRoom.JPG" height="219px" width="219px"/>'
+		        ],
+				on_finish: function(data){
+				    if(data.button_pressed == data.corr_resp){// 0 is left
+				      data.correct = true; // can add property correct by modify data object directly
+				    } else {
+				      data.correct = false;
+				    }
+
+
+				  }
+			},
+			
+		],
+		
+		
+		timeline_variables: [
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+femaleOne+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "female",
+			model: femaleOne,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+femaleTwo+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "female",
+			model: femaleTwo,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+maleOne+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "male",
+			model: maleOne,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+maleTwo+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "male",
+			model: maleTwo,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+femaleOne+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "female",
+			model: femaleOne,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+femaleTwo+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "female",
+			model: femaleTwo,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+maleOne+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "male",
+			model: maleOne,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+maleTwo+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "male",
+			model: maleTwo,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			
+		],
+	
+		sample: {
+		        type: 'fixed-repetitions',
+		        size: 1, // 3 repetitions of each trial, 12 total trials, order is randomized.
+		    }
+		
+	};
+    timeline.push(test);
+}
+
+
+	/* instructions for supervised */
+	var instructions_sup = {
+	    type: 'html-keyboard-response',
+	    stimulus: "<p style='font-size: 36px'>You will play again.</p><p style='font-size: 36px'>This time we will give you feedback.</p>",
+		choices: jsPsych.ALL_KEYS,
+	  	response_ends_trial: true
+	};
+    timeline.push(instructions_sup);
+	
+	/*training block 1*/
+	for(var i=0; i<6; i++){
+	var train = {
+		timeline: [
+
+			{
+				type: 'image-button-response',
+	      	  	stimulus: jsPsych.timelineVariable('image'),
+	      	  	choices: ['left', 'right'],
+				margin_horizontal: '150px',
+				response_ends_trial: true, 
+				data: {
+					stimulus_type: [jsPsych.timelineVariable('stimulus_type')],
+					corr_resp: [jsPsych.timelineVariable('corr_resp')],
+					percent: [jsPsych.timelineVariable('percent_morph')],
+					model_gen: [jsPsych.timelineVariable('model_gender')],
+					model_num: [jsPsych.timelineVariable('model')],
+					block: 'training'
+					  },
+		        button_html: [
+		            '<img src="cat_images/redRoom.JPG" height="219px" width="219px"/>',
+					'<img src="cat_images/blueRoom.JPG" height="219px" width="219px"/>'
+		        ],
+				on_finish: function(data){
+				    if(data.button_pressed == data.corr_resp){// 0 is left
+				      data.correct = true; // can add property correct by modify data object directly
+				    } else {
+				      data.correct = false;
+				    }
+
+				  }
+			},
+			
+			{
+			  type: 'html-keyboard-response',
+			  trial_duration: 800,
+			  stimulus: function(){
+			    var last_trial_correct = jsPsych.data.get().last(1).values()[0].correct;
+			    if(last_trial_correct){
+			      return "<p style='font-size: 36px'>Correct!</p>";
+			    } else {
+			      return "<p style='font-size: 36px'>Incorrect.</p>"
+			    }
+			  }
+			},
+			
+		],
+		
+		timeline_variables: [
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+femaleOne+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "female",
+			model: femaleOne,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+femaleTwo+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "female",
+			model: femaleTwo,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+maleOne+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "male",
+			model: maleOne,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledCalm[i]+emotion+maleTwo+'.JPG'], 
+			percent_morph: shuffledCalm[i],
+			model_gender: "male",
+			model: maleTwo,
+			stimulus_type: "calm",
+			corr_resp: 1,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+femaleOne+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "female",
+			model: femaleOne,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+femaleTwo+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "female",
+			model: femaleTwo,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+maleOne+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "male",
+			model: maleOne,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			{image: ['cat_images/'+shuffledAngry[i]+emotion+maleTwo+'.JPG'], 
+			percent_morph: shuffledAngry[i],
+			model_gender: "male",
+			model: maleTwo,
+			stimulus_type: "anger",
+			corr_resp: 0,
+			},
+			
+		],
+	
+		sample: {
+		        type: 'fixed-repetitions',
+		        size: 1, // 3 repetitions of each trial, 12 total trials, order is randomized.
+		    }
+		
+	};
+    timeline.push(train);
+}
+	
+
+	
+	/* All Done */
+	var done = {
+	    type: 'html-keyboard-response',
+	    stimulus: "<p style='font-size: 36px'>You are all done!</p><p style='font-size: 36px'>Thank you!</p>",
+		choices: jsPsych.ALL_KEYS,
+	  	response_ends_trial: true
+	};
+    timeline.push(done);
+	
+	// exit fullscreen mode
+	/*timeline.push({
+	  type: 'fullscreen',
+	  fullscreen_mode: false
+	});
+
+	
+    /* start the experiment */
+    jsPsych.init({
+	  timeline: timeline,
+	  //preload_images: images,
+	  exclusions: {
+	      min_width: 800,
+	      min_height: 600
+	    },
+	   on_close: function(){
+		      var data = jsPsych.data.get().json();
+		      save_data_to_server(data);
+		    },
+       on_finish: function() {
+        jsPsych.data.addProperties({
+			//id: id,
+			//condition: conditionName
+        });
+        jsPsych.data.get().localSave('csv','CAT-test_'+id+'.csv');
+      }
+    });
+	
+	
+
+
+  </script>
+</html>
