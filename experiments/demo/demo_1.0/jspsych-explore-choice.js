@@ -42,7 +42,7 @@ jsPsych.plugins['explore-choice'] = (function() {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'rewards',
         array: true,
-        default: [10,25,50,100],
+        default: [5,15,30,60],
         description: 'Array specifying the rewards for each bandit choice'
       },
 	  cur_score: {
