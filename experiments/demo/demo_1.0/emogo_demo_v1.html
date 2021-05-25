@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <script src="jsPsych-6.3.1/examples/js/snap.svg-min.js"></script>
+  <script src="jsPsych-6.3.1/jspsych.js"></script>
+  <script src="jspsych-explore-choice.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-preload.js"></script>
+  <link rel="stylesheet" href="jsPsych-6.3.1/css/jspsych.css">
+</head>
+<body></body>
+<script>
+  var images = ["stimuli/AF01_NeutralHappy/AF01_NHMorph0.png", "stimuli/AF01_NeutralHappy/AF01_NHMorph20.png", "stimuli/BF03_NeutralAngry/BF03_NeutraltoAngry0.png", "stimuli/BF03_NeutralAngry/BF03_NeutraltoAngry20.png"];
+
+  var preload = {
+    type: 'preload',
+    auto_preload: true
+  }
+
+  // create vsl block for jspsych
+  var cur_score = 1
+  var trial_counter = 1
+  var block = {
+    type: 'explore-choice',
+	timeline: [
+		{stimuli: images},
+		{stimuli: images},
+		{stimuli: images},
+		{stimuli: images},
+	      ],
+	on_start: function(trial) {
+		if (trial_counter > 1) {
+			trial.cur_score = cur_score;
+			console.log(cur_score);
+		}
+		trial_counter++;	
+	},
+	on_finish: function(data) {
+		cur_score = data.score_after_trial
+	}
+  };
+
+  jsPsych.init({
+    timeline: [preload, block],
+    on_finish: function() {
+      jsPsych.data.displayData();
+    }
+  });
+</script>
+
+</html>
