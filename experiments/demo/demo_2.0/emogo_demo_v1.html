@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <script src="jsPsych-6.3.1/examples/js/snap.svg-min.js"></script>
+  <script src="jsPsych-6.3.1/jspsych.js"></script>
+  <script src="jspsych-explore-choice.js"></script>
+  <script src="jspsych-show-reward.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-preload.js"></script>
+  <link rel="stylesheet" href="jsPsych-6.3.1/css/jspsych.css">
+</head>
+<body></body>
+<script>
+  var images = ["stimuli/AF01_NeutralHappy/AF01_NHMorph0.png", "stimuli/AF01_NeutralHappy/AF01_NHMorph20.png",
+	 "stimuli/BF03_NeutralAngry/BF03_NeutraltoAngry0.png", "stimuli/BF03_NeutralAngry/BF03_NeutraltoAngry20.png"];
+
+  var preload = {
+    type: 'preload',
+    auto_preload: true
+  }
+  
+  var rewards = [8,16,32,64];
+  var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"]
+
+  // create vsl block for jspsych
+  var cur_score = 0
+  var trial_counter = 1
+  var timeline=[]
+  
+  
+  for (i=0; i<10; i++) {
+	  var trial = {
+	    type: 'explore-choice',
+		stimuli: images,
+		on_start: function(trial) {
+			if (trial_counter > 1) {
+				trial.cur_score = cur_score;
+				console.log(cur_score);
+			}
+			trial_counter++;	
+		},
+		on_finish: function(data) {
+			cur_score = data.score_after_trial
+		}
+	  };
+  
+	  var show_reward = {
+		  type: 'show-reward',
+		  stimulus: function() {
+			  console.log(jsPsych.data.get().last(1).values());
+			  return jsPsych.data.get().last(1).values()[0].choiceImage
+		  },
+		  reward_image: function() {
+		  	return reward_images[jsPsych.data.get().last(1).values()[0].reward_index]
+		  },
+		  cur_reward: function() {
+		  	return reward_images[jsPsych.data.get().last(1).values()[0].reward]
+		  },
+		  cur_score: function() {
+		  	return jsPsych.data.get().last(1).values()[0].score_after_trial
+		  },
+		  trial_duration: 2000
+	  
+	  }
+	  timeline.push(trial);
+	  timeline.push(show_reward);
+  };
+ 
+
+  jsPsych.init({
+    timeline: timeline,
+    on_finish: function() {
+      jsPsych.data.displayData();
+    }
+  });
+</script>
+
+</html>
