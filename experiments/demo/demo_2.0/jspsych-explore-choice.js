@@ -135,13 +135,7 @@ jsPsych.plugins['explore-choice'] = (function() {
   var image4 = paper.image(trial.stimuli[3], imageLocations["bottomright"][0], imageLocations["bottomright"][1], trial.image_size[0],trial.image_size[1]);
   
   image1.click(function() {
-	image1.unclick();
-	image2.unclick();
-	image3.unclick();
-	image4.unclick();
-	reward_index = 0;
-	  end_time = performance.now();
-	  rt = end_time - start_time;
+		reward_index = 0;
 	  rect1.attr({
 		  fill: "#00ccff",
 		  "fill-opacity": 0.5
@@ -149,20 +143,11 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  choice = trial.stimuli[0];
 	  choiceLocation = "pos1";
 	  reward = trial.rewards[0];
-	  score_index.attr({y: scoreBoxLength+45-(trial.cur_score+reward), height: trial.cur_score+reward})
-  	setTimeout(function(){
-  		endTrial(choice,choiceLocation,rt,reward);
-  	},500);
+	  inputEvent();
   });
 
   image2.click(function() {
-	image1.unclick();
-	image2.unclick();
-	image3.unclick();
-	image4.unclick();
-	reward_index = 1;
-	  end_time = performance.now();
-	  rt = end_time - start_time;
+		reward_index = 1;
 	  rect2.attr({
 		  fill: "#00ccff",
 		  "fill-opacity": 0.5
@@ -170,20 +155,11 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  choice = trial.stimuli[1];
 	  choiceLocation = "pos2";
 	  reward = trial.rewards[1];
-	  score_index.attr({y: scoreBoxLength+45-(trial.cur_score+reward), height: trial.cur_score+reward})
-  	setTimeout(function(){
-  		endTrial(choice,choiceLocation,rt,reward);
-  	},500);
+	  inputEvent();
   });
   
   image3.click(function() {
-	image1.unclick();
-	image2.unclick();
-	image3.unclick();
-	image4.unclick();
-	reward_index = 2;
-	  end_time = performance.now();
-	  rt = end_time - start_time;
+		reward_index = 2;
 	  rect3.attr({
 		  fill: "#00ccff",
 		  "fill-opacity": 0.5
@@ -191,20 +167,11 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  choice = trial.stimuli[2];
 	  choiceLocation = "pos3";
 	  reward = trial.rewards[2];
-	  score_index.attr({y: scoreBoxLength+45-(trial.cur_score+reward), height: trial.cur_score+reward})
-  	setTimeout(function(){
-  		endTrial(choice,choiceLocation,rt,reward);
-  	},500);
+	  inputEvent();
   });
 
   image4.click(function() {
-	image1.unclick();
-	image2.unclick();
-	image3.unclick();
-	image4.unclick();
-	reward_index = 3;
-	  end_time = performance.now();
-	  rt = end_time - start_time;
+		reward_index = 3;
 	  rect4.attr({
 		  fill: "#00ccff",
 		  "fill-opacity": 0.5
@@ -212,20 +179,28 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  choice = trial.stimuli[3];
 	  choiceLocation = "pos4";
 	  reward = trial.rewards[3];
-	  score_index.attr({y: scoreBoxLength+45-(trial.cur_score+reward), height: trial.cur_score+reward})
-	setTimeout(function(){
-		endTrial(choice,choiceLocation,rt,reward);
-	},500);
+	  inputEvent();
 	  
   });
 
+  function inputEvent() {
+  	image1.unclick();
+		image2.unclick();
+		image3.unclick();
+		image4.unclick();
 
-    function endTrial(choice,choiceLocation,rt,reward) {
+	  end_time = performance.now();
+	  rt = end_time - start_time;
+	  setTimeout(function(){
+	  	endTrial();
+	  },500);
+  }
+
+
+    function endTrial() {
 		
 
       display_element.innerHTML = '';
-	  
-	  console.log(reward);
 
 	  
       var trial_data = {
