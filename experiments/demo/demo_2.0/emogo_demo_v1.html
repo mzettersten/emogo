@@ -12,13 +12,66 @@
 </head>
 <body></body>
 <script>
-  var images = ["stimuli/AF01_NeutralHappy/AF01_NHMorph0.png", "stimuli/AF01_NeutralHappy/AF01_NHMorph20.png",
-	 "stimuli/BF03_NeutralAngry/BF03_NeutraltoAngry0.png", "stimuli/BF03_NeutralAngry/BF03_NeutraltoAngry20.png"];
+  var timeline=[]
 
   var preload = {
     type: 'preload',
     auto_preload: true
   }
+  timeline.push(preload)
+
+
+  var structure_conditions = ["emotion","model"];
+  var match_conditions = ["match","mismatch"];
+
+  var models = ["AF01","AF02","AF03","AF05","AF06","AF08","AF09","AF10"];
+  var emotions = ["AO","CO","DO","FO","HC","HE","SC","SUR"];
+
+  var num_options = 4
+
+  var models_1 = jsPsych.randomization.sampleWithoutReplacement(models, num_options);
+  var emotions_1 = jsPsych.randomization.sampleWithoutReplacement(emotions, num_options);
+
+  console.log(models_1)
+  console.log(emotions_1)
+
+  var emotions_2 = emotions.filter( function( el ) {
+  return emotions_1.indexOf( el ) < 0;
+} );
+
+  console.log(emotions_2)
+
+  var models_2 = models.filter( function( el ) {
+  return models_1.indexOf( el ) < 0;
+} );
+
+  console.log(models_2)
+
+  //randomize order
+  var models_1_shuffled = jsPsych.randomization.shuffle(models_1);
+  var emotions_1_shuffled = jsPsych.randomization.shuffle(emotions_1);
+  var models_2_shuffled = jsPsych.randomization.shuffle(models_2);
+  var emotions_2_shuffled = jsPsych.randomization.shuffle(emotions_2);
+
+  console.log(emotions_1_shuffled)
+  console.log(emotions_2_shuffled)
+  console.log(models_1_shuffled)
+  console.log(models_2_shuffled)
+
+//put together images
+var img_ext = ".jpg";
+  var img_sep = "_";
+  var images_block_1 = []
+  for (i=0; i<emotions_1_shuffled.length; i++) {
+  	images_block_1.push("stimuli/"+models_1_shuffled[i]+img_sep+emotions_1_shuffled[i]+img_ext)
+  }
+  var images_block_2 = []
+  for (i=0; i<emotions_2_shuffled.length; i++) {
+  	images_block_2.push("stimuli/"+models_2_shuffled[i]+img_sep+emotions_2_shuffled[i]+img_ext)
+  }
+
+
+  var trial_number = 32;
   
   var rewards = [8,16,32,64];
   var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"]
@@ -26,13 +79,12 @@
   // create vsl block for jspsych
   var cur_score = 0
   var trial_counter = 1
-  var timeline=[]
   
   
   for (i=0; i<10; i++) {
 	  var trial = {
 	    type: 'explore-choice',
-		stimuli: images,
+		stimuli: images_block_1,
 		on_start: function(trial) {
 			if (trial_counter > 1) {
 				trial.cur_score = cur_score;
