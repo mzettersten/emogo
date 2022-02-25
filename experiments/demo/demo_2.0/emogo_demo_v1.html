@@ -84,6 +84,7 @@ var img_ext = ".jpg";
   for (i=0; i<10; i++) {
 	  var trial = {
 	    type: 'explore-choice',
+      instruction: "Click on the face that will give you the most stars.",
 		stimuli: images_block_1,
 		on_start: function(trial) {
 			if (trial_counter > 1) {
@@ -99,6 +100,11 @@ var img_ext = ".jpg";
   
 	  var show_reward = {
 		  type: 'show-reward',
+      instruction: function() {
+        cur_reward = jsPsych.data.get().last(1).values()[0].reward;
+        instruction = "You got " + cur_reward + " stars!";
+        return instruction
+      },
 		  stimulus: function() {
 			  console.log(jsPsych.data.get().last(1).values());
 			  return jsPsych.data.get().last(1).values()[0].choiceImage

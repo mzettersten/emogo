@@ -28,22 +28,29 @@ jsPsych.plugins['explore-choice'] = (function() {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'Canvas size',
         array: true,
-        default: [1000,800],
+        default: [800,800],
         description: 'Array specifying the width and height of the area that the animation will display in.'
       },
       image_size: {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'Image size',
         array: true,
-        default: [300,300],
+        default: [250,250],
         description: 'Array specifying the width and height of the images to show.'
       },
 	  rewards: {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'rewards',
         array: true,
-        default: [8,15,30,60],
+        default: [2,4,6,8],
         description: 'Array specifying the rewards for each bandit choice'
+      },
+      instruction: {
+        type: jsPsych.plugins.parameterType.STRING,
+        pretty_name: 'Instruction',
+        array: false,
+        default: "",
+        description: 'instruction shown to participant'
       },
 	  cur_score: {
         type: jsPsych.plugins.parameterType.INT,
@@ -76,28 +83,28 @@ jsPsych.plugins['explore-choice'] = (function() {
 
     var paper = Snap("#jspsych-test-canvas");
 	
-  var rect1 = paper.rect(25, 0, 350,350,10);
+  var rect1 = paper.rect(75, 125, 300,300,10);
   rect1.attr({
 	  fill: "#ffffff",
 	  stroke: "#000",
 	  strokeWidth: 5
   });
   
-  var rect2 = paper.rect(425, 0, 350,350,10);
+  var rect2 = paper.rect(425, 125, 300,300,10);
   rect2.attr({
 	  fill: "#ffffff",
 	  stroke: "#000",
 	  strokeWidth: 5
   });
   
-  var rect3 = paper.rect(25, 400, 350,350,10);
+  var rect3 = paper.rect(75, 475, 300,300,10);
   rect3.attr({
 	  fill: "#ffffff",
 	  stroke: "#000",
 	  strokeWidth: 5
   });
   
-  var rect4 = paper.rect(425, 400, 350,350,10);
+  var rect4 = paper.rect(425, 475, 300,300,10);
   rect4.attr({
 	  fill: "#ffffff",
 	  stroke: "#000",
@@ -105,29 +112,34 @@ jsPsych.plugins['explore-choice'] = (function() {
   });
   
   var imageLocations = {
-	  topleft: [50, 25],
-	  topright: [450, 25],
-	  bottomleft: [50, 425],
-	  bottomright: [450, 425],
+	  topleft: [100, 150],
+	  topright: [450, 150],
+	  bottomleft: [100, 500],
+	  bottomright: [450, 500],
 	  
   };
   
   var scoreBoxLength = 600;
-  var scoreBox = paper.rect(900, 50,50,scoreBoxLength);
+  var scoreBox = paper.rect(100, 25,scoreBoxLength,30);
   scoreBox.attr({
 	  fill:'#926239',
 	  stroke: "#000",
 	  strokeWidth: 5,
   });
   
-  var score_index = paper.rect(905, scoreBoxLength+45-trial.cur_score,40,trial.cur_score);
+  var score_index = paper.rect(105,30,trial.cur_score,20);
   score_index.attr({
-  	  fill:'#368f8b',
+  	  fill:'#FFFF00',
   	  stroke: "#000",
   	  strokeWidth: 0,
   });
 
-  
+  var instruction = paper.text(400,95,trial.instruction);
+  instruction.attr({
+		  "text-anchor": "middle",		  
+		  "font-weight": "bold",
+		  "font-size": 20
+	  });
   
   var image1 = paper.image(trial.stimuli[0], imageLocations["topleft"][0], imageLocations["topleft"][1], trial.image_size[0],trial.image_size[1]);
   var image2 = paper.image(trial.stimuli[1], imageLocations["topright"][0], imageLocations["topright"][1], trial.image_size[0],trial.image_size[1]);
@@ -217,7 +229,7 @@ jsPsych.plugins['explore-choice'] = (function() {
 		rt: rt,
 		  reward: reward,
 		  reward_index: reward_index,
-		  score_after_trial: trial.cur_score+reward
+		  score_after_trial: trial.cur_score+4*reward
 		
 	};
 	

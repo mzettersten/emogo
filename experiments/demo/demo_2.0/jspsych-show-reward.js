@@ -35,21 +35,21 @@ jsPsych.plugins['show-reward'] = (function() {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'Canvas size',
         array: true,
-        default: [1000,800],
+        default: [800,800],
         description: 'Array specifying the width and height of the area that the animation will display in.'
       },
       image_size: {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'Image size',
         array: true,
-        default: [300,300],
+        default: [250,250],
         description: 'Array specifying the width and height of the images to show.'
       },
 	  rewards: {
         type: jsPsych.plugins.parameterType.INT,
         pretty_name: 'rewards',
         array: true,
-        default: [8,16,32,64],
+        default: [2,4,6,8],
         description: 'Array specifying the rewards for each bandit choice'
       },
       cur_reward: {
@@ -58,6 +58,13 @@ jsPsych.plugins['show-reward'] = (function() {
         array: false,
         default: 8,
         description: 'current reward being shown to participant'
+      },
+      instruction: {
+        type: jsPsych.plugins.parameterType.STRING,
+        pretty_name: 'Instruction',
+        array: false,
+        default: "",
+        description: 'instruction shown to participant'
       },
 	  cur_score: {
         type: jsPsych.plugins.parameterType.INT,
@@ -91,7 +98,7 @@ jsPsych.plugins['show-reward'] = (function() {
 
     var paper = Snap("#jspsych-test-canvas");
 	
-  var rect = paper.rect(25, 200, 350,350,10);
+  var rect = paper.rect(75, 200, 300,300,10);
   rect.attr({
 	  fill: "#ffffff",
 	  stroke: "#000",
@@ -99,26 +106,32 @@ jsPsych.plugins['show-reward'] = (function() {
   });
   
   var imageLocations = {
-	  centerLeft: [50, 225],
+	  centerLeft: [100, 225],
 	  centerRight: [450, 225]
 	  
   };
   
   var scoreBoxLength = 600;
-  var scoreBox = paper.rect(900, 50,50,scoreBoxLength);
+  var scoreBox = paper.rect(100, 25,scoreBoxLength,30);
   scoreBox.attr({
-	  fill:'#926239',
-	  stroke: "#000",
-	  strokeWidth: 5,
+    fill:'#926239',
+    stroke: "#000",
+    strokeWidth: 5,
   });
   
-  var score_index = paper.rect(905, scoreBoxLength+45-trial.cur_score,40,trial.cur_score);
+  var score_index = paper.rect(105,30,trial.cur_score,20);
   score_index.attr({
-  	  fill:'#368f8b',
-  	  stroke: "#000",
-  	  strokeWidth: 0,
+      fill:'#FFFF00',
+      stroke: "#000",
+      strokeWidth: 0,
   });
 
+var instruction = paper.text(400,125,trial.instruction);
+  instruction.attr({
+      "text-anchor": "middle",      
+      "font-weight": "bold",
+      "font-size": 20
+    });
   
   
   var image = paper.image(trial.stimulus, imageLocations["centerLeft"][0], imageLocations["centerLeft"][1], trial.image_size[0],trial.image_size[1]);
