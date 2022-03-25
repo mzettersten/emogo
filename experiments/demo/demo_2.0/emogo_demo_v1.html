@@ -12,6 +12,16 @@
 </head>
 <body></body>
 <script>
+
+  //define permutation functions
+  const rotations = ([l, ...ls], rs = []) => 
+  l == undefined ? [] : [[l, ...ls, ...rs], ... rotations (ls, [...rs, l])]
+
+const permutations = ([l, ...ls]) =>
+  l == undefined ? [[]] : [...permutations (ls) .flatMap (p => rotations ([l, ...p])) ]
+
+
+
   var timeline=[]
 
   var preload = {
@@ -47,45 +57,84 @@
 
   console.log(models_2)
 
-  //randomize order
-  var models_1_shuffled = jsPsych.randomization.shuffle(models_1);
-  var emotions_1_shuffled = jsPsych.randomization.shuffle(emotions_1);
-  var models_2_shuffled = jsPsych.randomization.shuffle(models_2);
-  var emotions_2_shuffled = jsPsych.randomization.shuffle(emotions_2);
-
-  console.log(emotions_1_shuffled)
-  console.log(emotions_2_shuffled)
-  console.log(models_1_shuffled)
-  console.log(models_2_shuffled)
-
 //put together images
 var img_ext = ".jpg";
-  var img_sep = "_";
-  var images_block_1 = []
-  for (i=0; i<emotions_1_shuffled.length; i++) {
-  	images_block_1.push("stimuli/"+models_1_shuffled[i]+img_sep+emotions_1_shuffled[i]+img_ext)
+var img_sep = "_";
+var all_images_1 = []
+for (i=0; i<emotions_1.length; i++) {
+  for (j=0; j<models_1.length; j++) {
+    all_images_1.push("stimuli/"+models_1[j]+img_sep+emotions_1[i]+img_ext)
   }
-  var images_block_2 = []
-  for (i=0; i<emotions_2_shuffled.length; i++) {
-  	images_block_2.push("stimuli/"+models_2_shuffled[i]+img_sep+emotions_2_shuffled[i]+img_ext)
+}
+
+var all_images_2 = []
+for (i=0; i<emotions_2.length; i++) {
+  for (j=0; j<models_2.length; j++) {
+    all_images_2.push("stimuli/"+models_2[j]+img_sep+emotions_2[i]+img_ext)
   }
+}
+
+console.log(all_images_1);
+console.log(all_images_2);
+
+// CREATE ALL UNIQUE EMOTION/ MODEL COMBINATIONS
+
+var all_unique_trial_combinations_1 = [];
+var all_unique_trial_combinations_2 = [];
+
+//create all reorderings of model
+var model_1_combinations =permutations(models_1);
+console.log(model_1_combinations)
+var model_2_combinations = permutations(models_2);
+console.log(model_2_combinations)
+
+//combine unique model combination orders with (static) emotion array to create
+//all possible unordered combinations of models and emotions, 
+//such that each model and emotion occurs uniquely within each array/ trial
+for (i=0; i<model_1_combinations.length; i++) {
+  current_models = model_1_combinations[i];
+  current_combos=[];
+  for (j=0; j<current_models.length; j++) {
+    current_combos.push("stimuli/"+current_models[j]+img_sep+emotions_1[j]+img_ext)
+  }
+  all_unique_trial_combinations_1.push(current_combos);
+}
+
+for (i=0; i<model_2_combinations.length; i++) {
+  current_models = model_2_combinations[i];
+  current_combos=[];
+  for (j=0; j<current_models.length; j++) {
+    current_combos.push("stimuli/"+current_models[j]+img_sep+emotions_2[j]+img_ext)
+  }
+  all_unique_trial_combinations_2.push(current_combos);
+}
+
+console.log(all_unique_trial_combinations_1);
+console.log(all_unique_trial_combinations_2);
 
 
-  var trial_number = 32;
+var trial_number = 32;
   
-  var rewards = [8,16,32,64];
-  var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"]
+var rewards = [8,16,32,64];
+var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"]
 
-  // create vsl block for jspsych
-  var cur_score = 0
-  var trial_counter = 1
+// create vsl block for jspsych
+var cur_score = 0
+var trial_counter = 1
   
   
-  for (i=0; i<10; i++) {
+for (i=0; i<10; i++) {
+
+  current_trial = all_unique_trial_combinations_1[i];
+  //randomize position
+  current_trial_shuffled = jsPsych.randomization.shuffle(current_trial);
+
+  console.log(current_trial_shuffled);
+
 	  var trial = {
 	    type: 'explore-choice',
       instruction: "Click on the image that will give you the most stars.",
-		stimuli: images_block_1,
+		stimuli: current_trial_shuffled,
 		on_start: function(trial) {
 			if (trial_counter > 1) {
 				trial.cur_score = cur_score;
@@ -100,11 +149,12 @@ var img_ext = ".jpg";
   
 	  var show_reward = {
 		  type: 'show-reward',
-      instruction: function() {
-        cur_reward = jsPsych.data.get().last(1).values()[0].reward;
-        instruction = "You got " + cur_reward + " stars!";
-        return instruction
-      },
+      instruction: "",
+      // function() {
+      //   cur_reward = jsPsych.data.get().last(1).values()[0].reward;
+      //   instruction = "You got " + cur_reward + " stars!";
+      //   return instruction
+      // },
 		  stimulus: function() {
 			  console.log(jsPsych.data.get().last(1).values());
 			  return jsPsych.data.get().last(1).values()[0].choiceImage
