@@ -34,8 +34,8 @@ const permutations = ([l, ...ls]) =>
   var structure_conditions = ["emotion","model"];
   var match_conditions = ["match","mismatch"];
 
-  var models = ["AF01","AF02","AF03","AF05","AF06","AF08","AF09","AF10"];
-  var emotions = ["AO","CO","DO","FO","HC","HE","SC","SUR"];
+  var models = ["AF02", "AF09", "AF10", "AF11","AM03","AM04","AM05","AM06","BF04","BF05","BF06","BF08","BM03", "BM04", "BM07", "BM16","HF02", "HF04", "HF09", "HF10","HM02", "HM07", "HM09", "HM10","WF04", "WF06", "WF11", "WF14","WM07", "WM09", "WM11", "WM13"];
+  var emotions = ["AO","CC","DO","FO","HE","HO","SC","SUR"];
 
   var num_options = 4
 
@@ -45,16 +45,22 @@ const permutations = ([l, ...ls]) =>
   console.log(models_1)
   console.log(emotions_1)
 
+  //remove the initially selected models from set 1
+  var models_2_sample_set = models.filter( function( el ) {
+  return models_1.indexOf( el ) < 0;
+} );
+
+  console.log(models_2_sample_set)
+  
+  //select models for set 2
+  var models_2 = jsPsych.randomization.sampleWithoutReplacement(models_2_sample_set, num_options);
+
+  //select emotions for set 2 by removing already used emotions
   var emotions_2 = emotions.filter( function( el ) {
   return emotions_1.indexOf( el ) < 0;
 } );
 
   console.log(emotions_2)
-
-  var models_2 = models.filter( function( el ) {
-  return models_1.indexOf( el ) < 0;
-} );
-
   console.log(models_2)
 
 //put together images
