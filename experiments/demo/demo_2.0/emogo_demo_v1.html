@@ -33,8 +33,18 @@ const permutations = ([l, ...ls]) =>
 
   var structure_conditions = ["emotion","model"];
   var match_conditions = ["match","mismatch"];
+  var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
+  var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
 
-  var models = ["AF02", "AF09", "AF10", "AF11","AM03","AM04","AM05","AM06","BF04","BF05","BF06","BF08","BM03", "BM04", "BM07", "BM16","HF02", "HF04", "HF09", "HF10","HM02", "HM07", "HM09", "HM10","WF04", "WF06", "WF11", "WF14","WM07", "WM09", "WM11", "WM13"];
+  var reward_scores = [3,6,9,12];
+  var rewards = [2,4,6,8];
+  var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"];
+
+  var reward_index = [0,1,2,3];
+  reward_index_1 = jsPsych.randomization.shuffle(reward_index);
+  reward_index_2 = jsPsych.randomization.shuffle(reward_index);
+
+  var models = ["AF02", "AF09", "AF10", "AF11","AM03","AM05","AM06","AM09","BF04","BF05","BF06","BF08","BM03", "BM04", "BM07", "BM16","HF02", "HF04", "HF09", "HF10","HM02", "HM07", "HM09", "HM10","WF04", "WF06", "WF11", "WF14","WM07", "WM09", "WM11", "WM13"];
   var emotions = ["AO","CC","DO","FO","HE","HO","SC","SUR"];
 
   var num_options = 4
@@ -56,12 +66,57 @@ const permutations = ([l, ...ls]) =>
   var models_2 = jsPsych.randomization.sampleWithoutReplacement(models_2_sample_set, num_options);
 
   //select emotions for set 2 by removing already used emotions
-  var emotions_2 = emotions.filter( function( el ) {
+  var emotions_2_select = emotions.filter( function( el ) {
   return emotions_1.indexOf( el ) < 0;
 } );
+  //shuffle emotions
+  var emotions_2 = jsPsych.randomization.shuffle(emotions_2_select);
 
   console.log(emotions_2)
   console.log(models_2)
+
+  //create reward matrix
+  reward_matrix_1 = {};
+  reward_matrix_2 = {};
+  console.log(structure_condition);
+  console.log(match_condition);
+
+  if (structure_condition == "model") {
+    reward_vector_1 = models_1 
+    if (match_condition=="match") {
+      reward_vector_2 = models_2
+    } else if (match_condition=="mismatch") {
+      reward_vector_2 = emotions_2
+    }
+  } else if (structure_condition == "emotion") {
+    reward_vector_1 = emotions_1 
+    if (match_condition=="match") {
+      reward_vector_2 = emotions_2
+    } else if (match_condition=="mismatch") {
+      reward_vector_2 = models_2
+    }
+  }
+
+  for (k=0; k<reward_vector_1.length; k++) {
+    cur_reward_key = reward_vector_1[k];
+    cur_reward_index = reward_index_1[k];
+    cur_reward = rewards[cur_reward_index];
+    cur_reward_score = reward_scores[cur_reward_index];
+    cur_reward_image = reward_images[cur_reward_index];
+    reward_matrix_1[cur_reward_key] = {"reward": cur_reward, "reward_score": cur_reward_score, "reward_image": cur_reward_image}
+  }
+
+  for (l=0; l<reward_vector_2.length; l++) {
+    cur_reward_key = reward_vector_2[l];
+    cur_reward_index = reward_index_2[l];
+    cur_reward = rewards[cur_reward_index];
+    cur_reward_score = reward_scores[cur_reward_index];
+    cur_reward_image = reward_images[cur_reward_index];
+    reward_matrix_2[cur_reward_key] = {"reward": cur_reward, "reward_score": cur_reward_score, "reward_image": cur_reward_image}
+  }
+
+  console.log(reward_matrix_1);
+  console.log(reward_matrix_2);
 
 //put together images
 var img_ext = ".jpg";
@@ -97,11 +152,30 @@ console.log(model_2_combinations)
 //combine unique model combination orders with (static) emotion array to create
 //all possible unordered combinations of models and emotions, 
 //such that each model and emotion occurs uniquely within each array/ trial
+//also store relevant reward information
 for (i=0; i<model_1_combinations.length; i++) {
   current_models = model_1_combinations[i];
   current_combos=[];
   for (j=0; j<current_models.length; j++) {
-    current_combos.push("stimuli/"+current_models[j]+img_sep+emotions_1[j]+img_ext)
+    current_model = current_models[j];
+    current_emotion = emotions_1[j];
+    if (structure_condition == "emotion") {
+      current_reward_key = current_emotion
+    } else if (structure_condition == "model") {
+      current_reward_key = current_model
+    }
+
+    current_stimulus = {
+      "stimulus_id": current_model+img_sep+current_emotion,
+      "emotion": current_emotion,
+      "model": current_model,
+      "image": "stimuli/"+current_model+img_sep+current_emotion+img_ext,
+      "reward": reward_matrix_1[current_reward_key]["reward"],
+      "reward_score": reward_matrix_1[current_reward_key]["reward_score"],
+      "reward_image": reward_matrix_1[current_reward_key]["reward_image"],
+    }
+
+    current_combos.push(current_stimulus);
   }
   all_unique_trial_combinations_1.push(current_combos);
 }
@@ -110,7 +184,33 @@ for (i=0; i<model_2_combinations.length; i++) {
   current_models = model_2_combinations[i];
   current_combos=[];
   for (j=0; j<current_models.length; j++) {
-    current_combos.push("stimuli/"+current_models[j]+img_sep+emotions_2[j]+img_ext)
+    current_model = current_models[j];
+    current_emotion = emotions_2[j];
+    if (structure_condition == "emotion") {
+      if (match_condition=="match") {
+        current_reward_key = current_emotion
+      } else if (match_condition=="mismatch") {
+        current_reward_key = current_model
+      }
+    } else if (structure_condition == "model") {
+      if (match_condition=="match") {
+        current_reward_key = current_model
+      } else if (match_condition=="mismatch") {
+        current_reward_key = current_emotion
+      }
+    }
+
+    current_stimulus = {
+      "stimulus_id": current_model+img_sep+current_emotion,
+      "emotion": current_emotion,
+      "model": current_model,
+      "image": "stimuli/"+current_model+img_sep+current_emotion+img_ext,
+      "reward": reward_matrix_2[current_reward_key]["reward"],
+      "reward_score": reward_matrix_2[current_reward_key]["reward_score"],
+      "reward_image": reward_matrix_2[current_reward_key]["reward_image"],
+    }
+
+    current_combos.push(current_stimulus);
   }
   all_unique_trial_combinations_2.push(current_combos);
 }
@@ -120,66 +220,104 @@ console.log(all_unique_trial_combinations_2);
 
 
 var trial_number = 32;
-  
-var rewards = [8,16,32,64];
-var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"]
 
 // create vsl block for jspsych
 var cur_score = 0
 var trial_counter = 1
-  
-  
-for (i=0; i<10; i++) {
 
-  current_trial = all_unique_trial_combinations_1[i];
+function construct_trial(cur_trial) {
   //randomize position
-  current_trial_shuffled = jsPsych.randomization.shuffle(current_trial);
+  current_trial_shuffled = jsPsych.randomization.shuffle(cur_trial);
 
   console.log(current_trial_shuffled);
 
-	  var trial = {
-	    type: 'explore-choice',
+  //get stimulus property arrays
+  trial_stimuli = [];
+  trial_emotions = [];
+  trial_models = [];
+  trial_rewards = [];
+  trial_reward_scores = [];
+  trial_reward_images = [];
+  for (j=0; j<current_trial_shuffled.length; j++) {
+    cur_trial_stimulus = current_trial_shuffled[j];
+    trial_stimuli.push(cur_trial_stimulus["image"]);
+    trial_emotions.push(cur_trial_stimulus["emotion"]);
+    trial_models.push(cur_trial_stimulus["model"]);
+    trial_rewards.push(cur_trial_stimulus["reward"]);
+    trial_reward_scores.push(cur_trial_stimulus["reward_score"]);
+    trial_reward_images.push(cur_trial_stimulus["reward_image"]);
+  }
+
+
+    var trial = {
+      type: 'explore-choice',
       instruction: "Click on the image that will give you the most stars.",
-		stimuli: current_trial_shuffled,
-		on_start: function(trial) {
-			if (trial_counter > 1) {
-				trial.cur_score = cur_score;
-				console.log(cur_score);
-			}
-			trial_counter++;	
-		},
-		on_finish: function(data) {
-			cur_score = data.score_after_trial
-		}
-	  };
+    stimuli: trial_stimuli,
+    reward_scores: trial_reward_scores,
+    reward_images: trial_reward_images,
+    data: {
+      "emotions": trial_emotions,
+      "models": trial_models,
+      "rewards": trial_rewards
+
+    },
+    on_start: function(trial) {
+      if (trial_counter > 1) {
+        trial.cur_score = cur_score;
+        console.log(cur_score);
+      }
+      trial_counter++;  
+    },
+    on_finish: function(data) {
+      cur_score = data.score_after_trial
+    }
+    };
   
-	  var show_reward = {
-		  type: 'show-reward',
+    var show_reward = {
+      type: 'show-reward',
       instruction: "",
       // function() {
       //   cur_reward = jsPsych.data.get().last(1).values()[0].reward;
       //   instruction = "You got " + cur_reward + " stars!";
       //   return instruction
       // },
-		  stimulus: function() {
-			  console.log(jsPsych.data.get().last(1).values());
-			  return jsPsych.data.get().last(1).values()[0].choiceImage
-		  },
-		  reward_image: function() {
-		  	return reward_images[jsPsych.data.get().last(1).values()[0].reward_index]
-		  },
-		  cur_reward: function() {
-		  	return reward_images[jsPsych.data.get().last(1).values()[0].reward]
-		  },
-		  cur_score: function() {
-		  	return jsPsych.data.get().last(1).values()[0].score_after_trial
-		  },
-		  trial_duration: 2000
-	  
-	  }
-	  timeline.push(trial);
-	  timeline.push(show_reward);
-  };
+      stimulus: function() {
+        console.log(jsPsych.data.get().last(1).values());
+        return jsPsych.data.get().last(1).values()[0].choiceImage
+      },
+      reward_image: function() {
+        return jsPsych.data.get().last(1).values()[0].reward_image
+      },
+      cur_reward: function() {
+        return trial_rewards[jsPsych.data.get().last(1).values()[0].reward_index]
+      },
+      cur_score: function() {
+        return jsPsych.data.get().last(1).values()[0].score_after_trial
+      },
+      trial_duration: 2000
+    
+    }
+    timeline.push(trial);
+    timeline.push(show_reward);
+}
+  
+//add round 1
+  
+for (i=0; i<all_unique_trial_combinations_1.length; i++) {
+
+  current_trial = all_unique_trial_combinations_1[i];
+  console.log(current_trial);
+  construct_trial(current_trial);
+};
+
+//add round 2
+  
+for (i=0; i<all_unique_trial_combinations_2.length; i++) {
+
+  current_trial = all_unique_trial_combinations_2[i];
+  console.log(current_trial);
+  construct_trial(current_trial);
+};
  
 
   jsPsych.init({

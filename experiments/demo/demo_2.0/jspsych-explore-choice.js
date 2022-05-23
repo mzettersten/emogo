@@ -38,12 +38,20 @@ jsPsych.plugins['explore-choice'] = (function() {
         default: [250,250],
         description: 'Array specifying the width and height of the images to show.'
       },
-	  rewards: {
+	  reward_scores: {
         type: jsPsych.plugins.parameterType.INT,
-        pretty_name: 'rewards',
+        pretty_name: 'reward scores',
         array: true,
-        default: [2,4,6,8],
+        default: [8,16,32,64],
         description: 'Array specifying the rewards for each bandit choice'
+      },
+
+    reward_images: {
+        type: jsPsych.plugins.parameterType.IMAGE,
+        pretty_name: 'reward images',
+        array: true,
+        default: ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"],
+        description: 'Array specifying the reward images for each trial'
       },
       instruction: {
         type: jsPsych.plugins.parameterType.STRING,
@@ -71,7 +79,7 @@ jsPsych.plugins['explore-choice'] = (function() {
  	 var choiceLocation = "NA";
  	 var rt = "NA";
   	var end_time = "NA";
-	var reward = "NA";
+	var reward_score = "NA";
 	var reward_index = "NA";
     
   var trial_data={};
@@ -154,7 +162,7 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  });
 	  choice = trial.stimuli[0];
 	  choiceLocation = "pos1";
-	  reward = trial.rewards[0];
+	  reward_score = trial.reward_scores[0];
 	  inputEvent();
   });
 
@@ -166,7 +174,7 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  });
 	  choice = trial.stimuli[1];
 	  choiceLocation = "pos2";
-	  reward = trial.rewards[1];
+	  reward_score = trial.reward_scores[1];
 	  inputEvent();
   });
   
@@ -178,7 +186,7 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  });
 	  choice = trial.stimuli[2];
 	  choiceLocation = "pos3";
-	  reward = trial.rewards[2];
+	  reward_score = trial.reward_scores[2];
 	  inputEvent();
   });
 
@@ -190,7 +198,7 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  });
 	  choice = trial.stimuli[3];
 	  choiceLocation = "pos4";
-	  reward = trial.rewards[3];
+	  reward_score = trial.reward_scores[3];
 	  inputEvent();
 	  
   });
@@ -227,13 +235,14 @@ jsPsych.plugins['explore-choice'] = (function() {
 		choiceLocation: choiceLocation,
 		choiceImage: choice,
 		rt: rt,
-		  reward: reward,
+		  reward_score: reward_score,
 		  reward_index: reward_index,
-		  score_after_trial: trial.cur_score+4*reward
+		  reward_image: trial.reward_images[reward_index],
+		  score_after_trial: trial.cur_score+reward_score
 		
 	};
 	
-	console.log(trial.cur_score+reward)
+	console.log(trial.cur_score+reward_score)
 
       jsPsych.finishTrial(trial_data);
 	  
