@@ -7,6 +7,7 @@
   <script src="jsPsych-6.3.1/jspsych.js"></script>
   <script src="jspsych-explore-choice.js"></script>
   <script src="jspsych-show-reward.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-instructions.js"></script>
   <script src="jsPsych-6.3.1/plugins/jspsych-preload.js"></script>
   <link rel="stylesheet" href="jsPsych-6.3.1/css/jspsych.css">
 </head>
@@ -46,14 +47,21 @@ function compute_reward(reward,noise_type,reward_adj_factor,reward_adj_shift) {
   return updated_reward
 }
 
-  var timeline=[]
+  var timeline=[];
 
   var preload = {
     type: 'preload',
     auto_preload: true
   }
-  timeline.push(preload)
+  timeline.push(preload);
 
+  var instructions = {
+    type: 'instructions',
+    pages: ['<p>Welcome to the game!</p><p>In this game, you will have the chance to earn rewards by collecting stars. <b>Your goal is to collect as many stars as possible.</b> You can collect stars by clicking on images of faces. After you click on an image, you will see how many stars you collected.</p><p>Do your best to collect as many stars as you can! <b>The top 50 participants who collect the most stars will receive a $X.XX bonus.</b></p><p>The game will take approximately XX minutes. Click next to begin.</p>'],
+    show_clickable_nav: true
+  }
+
+  timeline.push(instructions);
 
   var structure_conditions = ["emotion","model"];
   var match_conditions = ["match","mismatch"];
@@ -360,6 +368,18 @@ for (i=0; i<all_unique_trial_combinations_2.length; i++) {
   console.log(current_trial);
   construct_trial(current_trial);
 };
+
+var experiment_end = {
+    type: 'instructions',
+    pages: function() {
+      final_score = Math.floor((jsPsych.data.get().last(1).values()[0].score_after_trial-1) / reward_depiction_factor);
+      return ['<p>Thank you for playing the game! You collected ' + String(final_score) + ' stars!</p><p>If you finish in the top 50 participants overall, you will receive a $X.XX bonus in addition to your compensation for completing the task.</p><p>Now we have a few brief questions. Click next to begin.</p>']
+    },
+    show_clickable_nav: true
+  }
+
+  timeline.push(experiment_end);
+
  
 
   jsPsych.init({
