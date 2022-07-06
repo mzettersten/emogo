@@ -21,6 +21,30 @@ const permutations = ([l, ...ls]) =>
   l == undefined ? [[]] : [...permutations (ls) .flatMap (p => rotations ([l, ...p])) ]
 
 
+// function for generating a normal distribution between [0,1]
+  function randn_bm() {
+  let u = 0, v = 0;
+  while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+  while(v === 0) v = Math.random();
+  let num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+  num = num / 10.0 + 0.5; // Translate to 0 -> 1
+  if (num > 1 || num < 0) return randn_bm() // resample between 0 and 1
+  return num
+}
+
+// function for generating reward (with noise)
+function compute_reward(reward,noise_type,reward_adj_factor,reward_adj_shift) {
+  //compute reward noise
+  if (noise_type == "normal") {
+    reward_noise = Math.floor(randn_bm()*reward_adj_factor)-reward_adj_shift;
+  } else if (noise_type == "uniform") {
+    reward_noise = Math.floor(Math.random()*reward_adj_factor)-reward_adj_shift;
+  } else {
+    reward_noise = 0;
+  }
+  updated_reward = reward + reward_noise
+  return updated_reward
+}
 
   var timeline=[]
 
@@ -36,9 +60,11 @@ const permutations = ([l, ...ls]) =>
   var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
   var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
 
-  var reward_scores = [3,6,9,12];
   var rewards = [2,4,6,8];
-  var reward_images = ["stimuli/stars_2.png","stimuli/stars_4.png","stimuli/stars_6.png","stimuli/stars_8.png"];
+  var reward_depiction_factor = 1.5;
+  var reward_adj_factor = 5;
+  var reward_adj_shift = 2;
+  var noise_type = "uniform";
 
   var reward_index = [0,1,2,3];
   reward_index_1 = jsPsych.randomization.shuffle(reward_index);
@@ -101,18 +127,14 @@ const permutations = ([l, ...ls]) =>
     cur_reward_key = reward_vector_1[k];
     cur_reward_index = reward_index_1[k];
     cur_reward = rewards[cur_reward_index];
-    cur_reward_score = reward_scores[cur_reward_index];
-    cur_reward_image = reward_images[cur_reward_index];
-    reward_matrix_1[cur_reward_key] = {"reward": cur_reward, "reward_score": cur_reward_score, "reward_image": cur_reward_image}
+    reward_matrix_1[cur_reward_key] = {"reward": cur_reward}
   }
 
   for (l=0; l<reward_vector_2.length; l++) {
     cur_reward_key = reward_vector_2[l];
     cur_reward_index = reward_index_2[l];
     cur_reward = rewards[cur_reward_index];
-    cur_reward_score = reward_scores[cur_reward_index];
-    cur_reward_image = reward_images[cur_reward_index];
-    reward_matrix_2[cur_reward_key] = {"reward": cur_reward, "reward_score": cur_reward_score, "reward_image": cur_reward_image}
+    reward_matrix_2[cur_reward_key] = {"reward": cur_reward}
   }
 
   console.log(reward_matrix_1);
@@ -165,14 +187,24 @@ for (i=0; i<model_1_combinations.length; i++) {
       current_reward_key = current_model
     }
 
+    //add noise to the reward (potentially)
+    current_reward_adjusted = compute_reward(
+      reward_matrix_1[current_reward_key]["reward"],
+      noise_type,
+      reward_adj_factor,
+      reward_adj_shift)
+
+    console.log(current_reward_adjusted)
+
     current_stimulus = {
       "stimulus_id": current_model+img_sep+current_emotion,
       "emotion": current_emotion,
       "model": current_model,
       "image": "stimuli/"+current_model+img_sep+current_emotion+img_ext,
-      "reward": reward_matrix_1[current_reward_key]["reward"],
-      "reward_score": reward_matrix_1[current_reward_key]["reward_score"],
-      "reward_image": reward_matrix_1[current_reward_key]["reward_image"],
+      "reward_unadjusted": reward_matrix_1[current_reward_key]["reward"],
+      "reward": current_reward_adjusted,
+      "reward_score": current_reward_adjusted*reward_depiction_factor,
+      "reward_image": "stimuli/stars_"+String(current_reward_adjusted)+".png",
     }
 
     current_combos.push(current_stimulus);
@@ -200,14 +232,24 @@ for (i=0; i<model_2_combinations.length; i++) {
       }
     }
 
+    console.log(reward_matrix_2);
+    console.log(current_reward_key);
+
+    current_reward_adjusted = compute_reward(
+      reward_matrix_2[current_reward_key]["reward"],
+      noise_type,
+      reward_adj_factor,
+      reward_adj_shift)
+
     current_stimulus = {
       "stimulus_id": current_model+img_sep+current_emotion,
       "emotion": current_emotion,
       "model": current_model,
       "image": "stimuli/"+current_model+img_sep+current_emotion+img_ext,
-      "reward": reward_matrix_2[current_reward_key]["reward"],
-      "reward_score": reward_matrix_2[current_reward_key]["reward_score"],
-      "reward_image": reward_matrix_2[current_reward_key]["reward_image"],
+      "reward_unadjusted": reward_matrix_2[current_reward_key]["reward"],
+      "reward": current_reward_adjusted,
+      "reward_score": current_reward_adjusted*reward_depiction_factor,
+      "reward_image": "stimuli/stars_"+String(current_reward_adjusted)+".png",
     }
 
     current_combos.push(current_stimulus);
@@ -217,9 +259,6 @@ for (i=0; i<model_2_combinations.length; i++) {
 
 console.log(all_unique_trial_combinations_1);
 console.log(all_unique_trial_combinations_2);
-
-
-var trial_number = 32;
 
 // create vsl block for jspsych
 var cur_score = 0
@@ -236,6 +275,7 @@ function construct_trial(cur_trial) {
   trial_emotions = [];
   trial_models = [];
   trial_rewards = [];
+  trial_rewards_unadjusted = [];
   trial_reward_scores = [];
   trial_reward_images = [];
   for (j=0; j<current_trial_shuffled.length; j++) {
@@ -244,6 +284,7 @@ function construct_trial(cur_trial) {
     trial_emotions.push(cur_trial_stimulus["emotion"]);
     trial_models.push(cur_trial_stimulus["model"]);
     trial_rewards.push(cur_trial_stimulus["reward"]);
+    trial_rewards_unadjusted.push(cur_trial_stimulus["reward_unadjusted"]);
     trial_reward_scores.push(cur_trial_stimulus["reward_score"]);
     trial_reward_images.push(cur_trial_stimulus["reward_image"]);
   }
@@ -258,7 +299,8 @@ function construct_trial(cur_trial) {
     data: {
       "emotions": trial_emotions,
       "models": trial_models,
-      "rewards": trial_rewards
+      "rewards": trial_rewards,
+      "rewards_unadjusted": trial_rewards_unadjusted
 
     },
     on_start: function(trial) {
