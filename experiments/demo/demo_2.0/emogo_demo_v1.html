@@ -9,6 +9,8 @@
   <script src="jspsych-show-reward.js"></script>
   <script src="jsPsych-6.3.1/plugins/jspsych-instructions.js"></script>
   <script src="jsPsych-6.3.1/plugins/jspsych-preload.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-text.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-html-slider-response.js"></script>
   <link rel="stylesheet" href="jsPsych-6.3.1/css/jspsych.css">
 </head>
 <body></body>
@@ -347,8 +349,8 @@ function construct_trial(cur_trial) {
       trial_duration: 2000
     
     }
-    timeline.push(trial);
-    timeline.push(show_reward);
+    //timeline.push(trial);
+    //timeline.push(show_reward);
 }
   
 //add round 1
@@ -379,6 +381,44 @@ var experiment_end = {
   }
 
   timeline.push(experiment_end);
+
+  //demographics
+
+  //emotion questions
+  var images_to_rate = all_images_1.concat(all_images_2);
+  var emotion_question_timeline = [];
+  for (i=0; i<images_to_rate.length; i++) {
+    emotion_question_timeline.push({'pic': images_to_rate[i]})
+};
+
+emotion_question_timeline_shuffled = jsPsych.randomization.shuffle(emotion_question_timeline)
+
+console.log(emotion_question_timeline_shuffled)
+
+for (i=0; i<emotion_question_timeline_shuffled.length; i++) {
+  current_emotion_question = emotion_question_timeline_shuffled[i];
+  console.log(current_emotion_question)
+  var prompt_text = '<img src="'+current_emotion_question['pic']+'" style="width: 300px;"><p>What emotion is this person expressing?</p>'
+  emotion_question_1 = {
+    type: 'survey-text',
+    questions: [
+    {prompt: prompt_text}
+    ]
+    
+  }
+  timeline.push(emotion_question_1);
+  emotion_question_2 = {
+      type: 'html-slider-response',
+      prompt: '<p>Rate the intensity of the emotion.</p>',
+      stimulus: '<img src="'+current_emotion_question['pic']+'" style="width: 300px;">',
+      min: 0,
+      max: 100,
+      slider_start: 50,
+      labels: ["0 = not at all intense","100 = extremely intense"]
+    }
+  timeline.push(emotion_question_2);
+}
+  //game questions
 
  
 
