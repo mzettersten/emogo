@@ -25,6 +25,7 @@ const permutations = ([l, ...ls]) =>
 
 
 // function for generating a normal distribution between [0,1]
+// source: https://stackoverflow.com/questions/25582882/javascript-math-random-normal-distribution-gaussian-bell-curve/36481059#36481059
   function randn_bm() {
   let u = 0, v = 0;
   while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
