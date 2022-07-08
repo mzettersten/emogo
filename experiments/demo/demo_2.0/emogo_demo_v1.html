@@ -350,8 +350,8 @@ function construct_trial(cur_trial) {
       trial_duration: 2000
     
     }
-    //timeline.push(trial);
-    //timeline.push(show_reward);
+    timeline.push(trial);
+    timeline.push(show_reward);
 }
   
 //add round 1
@@ -415,7 +415,7 @@ for (i=0; i<emotion_question_timeline_shuffled.length; i++) {
       min: 0,
       max: 100,
       slider_start: 50,
-      labels: ["0 = not at all intense","100 = extremely intense"]
+      labels: ["not at all intense","extremely intense"]
     }
   timeline.push(emotion_question_2);
 }
