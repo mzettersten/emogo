@@ -52,27 +52,13 @@ function compute_reward(reward,noise_type,reward_adj_factor,reward_adj_shift) {
 
   var timeline=[];
 
-  var preload = {
-    type: 'preload',
-    auto_preload: true
-  }
-  timeline.push(preload);
-
-  var instructions = {
-    type: 'instructions',
-    pages: ['<p>Welcome to the game!</p><p>In this game, you will have the chance to earn rewards by collecting stars. <b>Your goal is to collect as many stars as possible.</b> You can collect stars by clicking on images of faces. After you click on an image, you will see how many stars you collected.</p><p>Do your best to collect as many stars as you can! <b>The top 50 participants who collect the most stars will receive a $X.XX bonus.</b></p><p>The game will take approximately XX minutes. Click next to begin.</p>'],
-    show_clickable_nav: true
-  }
-
-  timeline.push(instructions);
-
   var structure_conditions = ["emotion","model"];
   var match_conditions = ["match","mismatch"];
   var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
   var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
 
   var rewards = [2,4,6,8];
-  var reward_depiction_factor = 1.5;
+  var reward_depiction_factor = 0.5;
   var reward_adj_factor = 5;
   var reward_adj_shift = 2;
   var noise_type = "uniform";
@@ -170,6 +156,8 @@ for (i=0; i<emotions_2.length; i++) {
 
 console.log(all_images_1);
 console.log(all_images_2);
+
+var all_images = all_images_1.concat(all_images_2);
 
 // CREATE ALL UNIQUE EMOTION/ MODEL COMBINATIONS
 
@@ -379,6 +367,23 @@ function construct_trial(cur_trial) {
     timeline.push(trial);
     timeline.push(show_reward);
 }
+
+//preload 
+var preload = {
+    type: 'preload',
+    auto_preload: true,
+    images: all_images
+  }
+  timeline.push(preload);
+
+// add instructions
+  var instructions = {
+    type: 'instructions',
+    pages: ['<p>Welcome to the game!</p><p>In this game, you will have the chance to earn rewards by collecting stars. <b>Your goal is to collect as many stars as possible.</b> You can collect stars by clicking on images of faces. After you click on an image, you will see how many stars you collected.</p><p>Do your best to collect as many stars as you can! <b>The top 50 participants who collect the most stars will receive a $X.XX bonus.</b></p><p>The game will take approximately XX minutes. Click next to begin.</p>'],
+    show_clickable_nav: true
+  }
+
+  timeline.push(instructions);
   
 //construct full experimental timeline
   
@@ -403,7 +408,7 @@ var experiment_end = {
   //demographics
 
   //emotion questions
-  var images_to_rate = all_images_1.concat(all_images_2);
+  var images_to_rate = all_images;
   var emotion_question_timeline = [];
   for (i=0; i<images_to_rate.length; i++) {
     emotion_question_timeline.push({'pic': images_to_rate[i]})

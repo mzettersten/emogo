@@ -127,15 +127,15 @@ jsPsych.plugins['explore-choice'] = (function() {
 	  
   };
   
-  var scoreBoxLength = 600;
-  var scoreBox = paper.rect(100, 25,scoreBoxLength,30);
+  var scoreBoxLength = 500;
+  var scoreBox = paper.rect(150, 25,scoreBoxLength,30);
   scoreBox.attr({
 	  fill:'#926239',
 	  stroke: "#000",
 	  strokeWidth: 5,
   });
   
-  var score_index = paper.rect(105,30,trial.cur_score,20);
+  var score_index = paper.rect(155,30,trial.cur_score,20);
   score_index.attr({
   	  fill:'#FFFF00',
   	  stroke: "#000",
