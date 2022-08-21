@@ -10,6 +10,8 @@
   <script src="jsPsych-6.3.1/plugins/jspsych-instructions.js"></script>
   <script src="jsPsych-6.3.1/plugins/jspsych-preload.js"></script>
   <script src="jsPsych-6.3.1/plugins/jspsych-survey-text.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-multi-choice.js"></script>
+  <script src="jsPsych-6.3.1/plugins/jspsych-survey-multi-select.js"></script>
   <script src="jsPsych-6.3.1/plugins/jspsych-html-slider-response.js"></script>
   <link rel="stylesheet" href="jsPsych-6.3.1/css/jspsych.css">
 </head>
@@ -158,6 +160,16 @@ console.log(all_images_1);
 console.log(all_images_2);
 
 var all_images = all_images_1.concat(all_images_2);
+var catch_images =  [
+	"stimuli/sheep.jpg",
+	"stimuli/hammer.jpg",
+	"stimuli/basketball.jpg",
+	"stimuli/horse.jpg",
+	"stimuli/chair.jpg",
+	"stimuli/zebra.jpg",
+	"stimuli/giraffe.jpg",
+	"stimuli/banana.jpg"];
+
 
 // CREATE ALL UNIQUE EMOTION/ MODEL COMBINATIONS
 
@@ -263,6 +275,7 @@ console.log(all_unique_trial_combinations_2);
 var num_blocks = 2; // one block is currently 24 trials, so 2 blocks is 48 trials
 var all_trials_1 = [];
 var all_trials_2 = [];
+var catch_trial_break = 47; // when to show the second round of catch trials
 // put all trials together for each round based on the number of blocks
 for (i=0; i<num_blocks; i++) {
   //shuffle block
@@ -369,21 +382,50 @@ function construct_trial(cur_trial) {
 }
 
 //preload 
+var preload_images = all_images.concat(catch_images);
+console.log(preload_images);
+
 var preload = {
     type: 'preload',
     auto_preload: true,
-    images: all_images
+    images: preload_images
   }
   timeline.push(preload);
 
 // add instructions
-  var instructions = {
+  var instructions_1 = {
     type: 'instructions',
-    pages: ['<p>Welcome to the game!</p><p>In this game, you will have the chance to earn rewards by collecting stars. <b>Your goal is to collect as many stars as possible.</b> You can collect stars by clicking on images of faces. After you click on an image, you will see how many stars you collected.</p><p>Do your best to collect as many stars as you can! <b>The top 50 participants who collect the most stars will receive a $X.XX bonus.</b></p><p>The game will take approximately XX minutes. Click next to begin.</p>'],
+    pages: ["<p>Welcome to the game!</p><p>First, we'll check you are able to see all of the images correctly. On the next two trials, click on the image that matches the word in the instructions.</p>",],
     show_clickable_nav: true
   }
 
-  timeline.push(instructions);
+  timeline.push(instructions_1);
+  
+  //add catch trials
+  var catch_trial_1 = {
+    type: 'explore-choice',
+    instruction: "Click on the horse.",
+  stimuli: ["stimuli/sheep.jpg","stimuli/hammer.jpg","stimuli/basketball.jpg","stimuli/horse.jpg"]
+  }
+  
+  timeline.push(catch_trial_1);
+  
+  var catch_trial_2 = {
+    type: 'explore-choice',
+    instruction: "Click on the hammer.",
+  stimuli: ["stimuli/basketball.jpg","stimuli/horse.jpg","stimuli/hammer.jpg","stimuli/sheep.jpg"]
+  }
+  
+  timeline.push(catch_trial_2);
+
+  // add instructions
+  var instructions_2 = {
+    type: 'instructions',
+    pages: ["<p>Great job! Now we'll begin the main game.</p><p> In this game, you will have the chance to earn rewards by collecting stars. <b>Your goal is to collect as many stars as possible.</b> You can collect stars by clicking on images of faces. After you click on an image, you will see how many stars you collected.</p><p>Do your best to collect as many stars as you can! <b>The top 50 participants who collect the most stars will receive a $X.XX bonus.</b></p><p>The game will take approximately XX minutes. Click next to begin.</p>"],
+    show_clickable_nav: true
+  }
+
+  timeline.push(instructions_2);
   
 //construct full experimental timeline
   
@@ -391,7 +433,41 @@ for (i=0; i<all_trials.length; i++) {
 
   current_trial = all_trials[i];
   console.log(current_trial);
-  construct_trial(current_trial);
+  //construct_trial(current_trial);
+  
+	//   if (i==catch_trial_break) {
+    // add instructions
+  // var instructions_3 = {
+  //   type: 'instructions',
+  //   pages: ["<p>Great job!</p><p>Next, we'll check again that you are able to see all of the images correctly. On the next two trials, click on the image that matches the word in the instructions.</p>",],
+  //   show_clickable_nav: true
+  // }
+
+  // timeline.push(instructions_3);
+	//   //add catch trials
+	//   var catch_trial_3 = {
+	//     type: 'explore-choice',
+	//     instruction: "Click on the banana.",
+	// 	  stimuli:
+	// ["stimuli/chair.jpg",
+	// "stimuli/zebra.jpg",
+	// "stimuli/giraffe.jpg",
+	// "stimuli/banana.jpg"]
+	//   }
+	//
+	//   timeline.push(catch_trial_3);
+	//
+	//   var catch_trial_4 = {
+	//     type: 'explore-choice',
+	//     instruction: "Click on the giraffe.",
+	//   stimuli: ["stimuli/chair.jpg",
+	// 	  "stimuli/banana.jpg",
+	// 	  "stimuli/giraffe.jpg",
+	// 	  "stimuli/zebra.jpg"]
+	//   }
+	//
+	//   timeline.push(catch_trial_4);
+	//   }
 };
 
 var experiment_end = {
@@ -404,8 +480,6 @@ var experiment_end = {
   }
 
   timeline.push(experiment_end);
-
-  //demographics
 
   //emotion questions
   var images_to_rate = all_images;
@@ -429,7 +503,7 @@ for (i=0; i<emotion_question_timeline_shuffled.length; i++) {
     ]
     
   }
-  timeline.push(emotion_question_1);
+  //timeline.push(emotion_question_1);
   emotion_question_2 = {
       type: 'html-slider-response',
       prompt: '<p>Rate the intensity of the emotion.</p>',
@@ -439,11 +513,69 @@ for (i=0; i<emotion_question_timeline_shuffled.length; i++) {
       slider_start: 50,
       labels: ["not at all intense","extremely intense"]
     }
-  timeline.push(emotion_question_2);
+  //timeline.push(emotion_question_2);
 }
+
+
+
+  //demographics
+  demographic_questions = []
+
+var demo_1 = {
+    type: 'survey-text',
+    preamble: "Next, we have just a few demographic questions.",
+    timeline: [
+    {questions: [{prompt: "Please enter your age (in number of years; e.g., 30).",name: "age"}]},
+    {questions: [{prompt: "What is your gender?",name: "gender"}]},
+    {questions: [{prompt: "What country do you currently live in? (e.g., United States)", name: "country"}]},
+    {questions: [{prompt: "What is your first/ primary language(s)?", name: "language"},{prompt: "Please list any other languages you are fluent in.", name: "other_languages"}]},
+
+    ]
+  }
+  timeline.push(demo_1);
+
+  var demo_2 = {
+  type: 'survey-multi-select',
+  preamble: "Next, we have just a few demographic questions.",
+  questions: [
+    {
+      prompt: "What is your race or ethnicity? Please check one or more boxes.", 
+      options: ["Black or African American", "Hispanic or Latino", "American Indian or Alaska Native", "Asian", "Native Hawaiian or Other Pacific Islander","Other","Prefer not to answer"], 
+      horizontal: false,
+      required: false,
+      name: 'race'
+    }
+    ]
+  }
+  timeline.push(demo_2);
+
+  var demo_3 = {
+  type: 'survey-multi-choice',
+
+  questions: [
+    {
+      prompt: "What is your current level of education?", 
+      options: ["Some high school", "High school", "Some college/ university", "Bachelor's degree", "Master's degree","Doctoral degree","Other professional degree","Not applicable/ unknown","Other","Prefer not to answer"], 
+      horizontal: false,
+      required: false,
+      name: 'education'
+    }
+    ]
+    } 
+  timeline.push(demo_3);
+ 
   //game questions
+  var debrief_questions = {
+    type: 'survey-text',
+    questions: [
+    {prompt: "Did you notice any patterns in the game? If yes, please exlain.",name: "patterns", rows: 3,columns: 60},
+    {prompt: "Did you use a strategy to win stars in the game? If yes, please exlain.",name: "strategy", rows: 3,columns: 60},
+    {prompt: "Any additional comments?", name: "comments", rows: 3,columns: 60}
+    ],
 
+  }
 
+timeline.push(debrief_questions);
  
 
   jsPsych.init({
