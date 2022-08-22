@@ -52,18 +52,77 @@ function compute_reward(reward,noise_type,reward_adj_factor,reward_adj_shift) {
   return updated_reward
 }
 
+//general function for grabbing parameter from a URL
+function getParamFromURL( name ) {
+  name = name.replace(/[\[]/,"\\[").replace(/[\]]/,"\\]");
+  var regexS = "[\?&]"+name+"=([^&#]*)";
+  var regex = new RegExp( regexS );
+  var results = regex.exec( window.location.href );
+  if( results == null )
+    return "";
+  else
+    return results[1];
+}
+
+  // get participant-specific url parameters from Prolific study link
+  var prolific_pid = getParamFromURL('PROLIFIC_PID');
+  var study_id = getParamFromURL('STUDY_ID');
+  var session_id = getParamFromURL('SESSION_ID');
+
+  //make sure that nobody can enter anything damaging
+  prolific_pid.replace(/[^A-Za-z0-9_]/g, "");
+  study_id.replace(/[^A-Za-z0-9_]/g, "");
+  session_id.replace(/[^A-Za-z0-9_]/g, "");
+
+  console.log(prolific_pid);
+  console.log(study_id);
+  console.log(session_id);
+
+  var prolific_code = "XXX"
+
   var timeline=[];
 
+  //create conditions based on url parameters
   var structure_conditions = ["emotion","model"];
   var match_conditions = ["match","mismatch"];
-  var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
-  var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
+  //var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
+  //var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
 
+  var structure_temp = getParamFromURL('struc');
+  var match_temp = getParamFromURL('mat');
+  if (structure_temp=="e") {
+    var structure_condition = "emotion"
+  } else if (structure_temp=="m") {
+    var structure_condition = "model"
+  } else {
+    var structure_condition = jsPsych.randomization.sampleWithoutReplacement(structure_conditions)[0];
+  }
+  if (match_temp=="ma") {
+    var match_condition = "match"
+  } else if (match_temp=="mi") {
+    var match_condition = "mismatch"
+  } else {
+    var match_condition = jsPsych.randomization.sampleWithoutReplacement(match_conditions)[0];
+  }
+
+  //create reward parameters
   var rewards = [2,4,6,8];
   var reward_depiction_factor = 0.5;
   var reward_adj_factor = 5;
   var reward_adj_shift = 2;
   var noise_type = "uniform";
+
+  // record information in the jsPsych data
+  // this adds a property called 'subject', a property called workerId, and a condition property
+  jsPsych.data.addProperties({
+    prolific_id: prolific_pid,
+    study: study_id,
+    session: session_id,
+    structure_condition: structure_condition,
+    match_condition: match_condition,
+    noise_type: noise_type
+  });
+
 
   var reward_index = [0,1,2,3];
   reward_index_1 = jsPsych.randomization.shuffle(reward_index);
@@ -413,7 +472,7 @@ var preload = {
   var catch_trial_2 = {
     type: 'explore-choice',
     instruction: "Click on the hammer.",
-  stimuli: ["stimuli/basketball.jpg","stimuli/horse.jpg","stimuli/hammer.jpg","stimuli/sheep.jpg"]
+  stimuli: ["stimuli/hammer.jpg","stimuli/basketball.jpg","stimuli/horse.jpg","stimuli/sheep.jpg"]
   }
   
   timeline.push(catch_trial_2);
@@ -433,8 +492,10 @@ for (i=0; i<all_trials.length; i++) {
 
   current_trial = all_trials[i];
   console.log(current_trial);
-  //construct_trial(current_trial);
+  construct_trial(current_trial);
   
+
+  // //add an extra set of catch trials between blocks 1 and 2 (currently commented out)
 	//   if (i==catch_trial_break) {
     // add instructions
   // var instructions_3 = {
@@ -516,10 +577,7 @@ for (i=0; i<emotion_question_timeline_shuffled.length; i++) {
   //timeline.push(emotion_question_2);
 }
 
-
-
   //demographics
-  demographic_questions = []
 
 var demo_1 = {
     type: 'survey-text',
@@ -576,12 +634,35 @@ var demo_1 = {
   }
 
 timeline.push(debrief_questions);
+
+//debrief and code message
+var experimentFinal = [];
+var final_instructions = {
+  type: 'instructions',
+  size: 400,
+  pages: [
+    'Congratulations, you are all done! Thanks for participating! In this experiment, we are interested in how people learn to associate different people and emotional cues with rewards. Please let us know if you have any questions!'
+        +"<br>" + "<br>"
+        +'<center>Your survey completion code for <u>Prolific</u> is</center>'
+        +"<br>"
+        +'<center><b style="font-size:20px">'+ prolific_code +'</b></center>'
+        +"<br>"
+        +'<center>Please make sure you save this somewhere safe. You will need to enter this code into Prolific to be paid.</center>'
+        ],
+  show_clickable_nav: false
+};
+
+//add instructions trial to experiment
+experimentFinal.push(final_instructions);
  
 
   jsPsych.init({
     timeline: timeline,
     on_finish: function() {
-      jsPsych.data.displayData();
+      //jsPsych.data.displayData();
+      jsPsych.init({
+        timeline: experimentFinal
+      });
     }
   });
 </script>
