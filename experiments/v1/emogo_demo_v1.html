@@ -64,6 +64,12 @@ function getParamFromURL( name ) {
     return results[1];
 }
 
+// ORGANIZE SUBJECT ID & GENERAL PARAMETERS
+// generate a random subject ID (just to be safe)
+var subject_id = Math.floor(Math.random()*1000000);
+subject_id="p"+subject_id.toString();
+//console.log(subject_id);
+
   // get participant-specific url parameters from mTurk study link
   var workerId = getParamFromURL('workerId');
   var assignmentId = getParamFromURL('assignmentId');
@@ -113,6 +119,7 @@ function getParamFromURL( name ) {
   // record information in the jsPsych data
   // this adds a property called 'subject', a property called workerId, and a condition property
   jsPsych.data.addProperties({
+    subject: subject_id,
     workerId: workerId,
     hitId: hitId,
     assignmentId: assignmentId,
