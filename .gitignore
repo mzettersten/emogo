@@ -3,3 +3,12 @@
 .RData
 .Ruserdata
 .DS_Store
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_12h09.43.369.csv
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_13h48.50.51.csv
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_14h20.00.17.csv
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_15h11.19.959.csv
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_15h11.32.183.csv
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_17h47.01.386.csv
+data-analysis/data/pilot-v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-23_17h55.12.402.csv
+data-analysis/data/pilot-v1/processed/emogo-pilot-v1alldata.csv
+data-analysis/analysis/rsconnect/documents/1_analysis.Rmd/rpubs.com/rpubs/Document.dcf
