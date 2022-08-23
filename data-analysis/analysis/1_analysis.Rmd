@@ -106,8 +106,8 @@ summarize_by_block_by_condition <- subject_by_block %>%
 
 ```{r}
 ggplot(subject_by_block,aes(explore_block,max_choice_percent, color=subject))+
-  geom_point(size=1.5)+
-  geom_line()+
+  geom_point(size=1.5,alpha=0.5)+
+  geom_line(alpha=0.5)+
   geom_point(data=summarize_by_block,aes(y=max_choice),size=2,color="black")+
   geom_line(data=summarize_by_block,aes(y=max_choice),size=1.2,color="black")+
   geom_errorbar(data=summarize_by_block,aes(y=max_choice,ymin=lower_se,ymax=upper_se),width=0,color="black")+
