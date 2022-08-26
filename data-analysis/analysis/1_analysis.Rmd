@@ -47,6 +47,14 @@ d <- d %>%
   ) %>%
   relocate(test_trial_number,.after=trial_number) %>%
   mutate(
+    block_trial_number = case_when(
+      test_trial_number < 49 ~ test_trial_number,
+      TRUE ~ test_trial_number - 48),
+    block_trial_number_c = block_trial_number - 24.5
+  ) %>%
+  relocate(block_trial_number,.after=test_trial_number) %>%
+  relocate(block_trial_number_c,.after=block_trial_number) %>%
+  mutate(
     explore_block = case_when(
       test_trial_number<9 ~ 1,
       test_trial_number<17 ~ 2,
@@ -129,6 +137,36 @@ ggplot(subject_by_block,aes(explore_block,max_choice_percent, color=subject))+
   scale_x_continuous(breaks=seq(1,12))+
   xlab("Block (8 Trials = 1 Block)")+
   ylab("Percent reward-maximizing choices")
+```
+
+## Model
+
+```{r}
+#recenter vars
+d <- d %>%
+  mutate(
+    structure_condition_c = case_when(
+      structure_condition == "model" ~ -0.5,
+      structure_condition == "emotion" ~ 0.5),
+    match_condition_c = case_when(
+      match_condition == "match" ~ 0.5,
+      match_condition == "mismatch" ~ -0.5
+    ),
+    block_c = case_when(
+      test_trial_number < 49 ~ -0.5,
+      TRUE ~ 0.5
+    )
+  )
+
+#fit model
+m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
+summary(m)
+
+m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c+ (1+block_c|subject)+(1|choiceImage),data=d, family=binomial)
+summary(m)
+
+m <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
+summary(m)
 ```
 
 

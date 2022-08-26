@@ -7,7 +7,7 @@ file_name <- "emogo-pilot-v1"
 
 merge_and_deidentify_data <- function(raw_data_directory, 
                                       merged_data_path, 
-                                      min_row=10) {
+                                      min_row=200) {
   
   raw_files <- here(raw_data_directory, dir(here(raw_data_directory), "*.csv"))
   
