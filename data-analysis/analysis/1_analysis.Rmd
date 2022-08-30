@@ -1,7 +1,7 @@
 ---
 title: "Emogo V1 Analysis"
 author: "Martin Zettersten"
-date: '2022-08-23'
+date: '2022-08-29'
 output: html_document
 ---
 
@@ -16,7 +16,7 @@ library(lme4)
 ## Read in data
 
 ```{r}
-data_path <- here("data-analysis","data","pilot-v1","processed", "emogo-pilot-v1-alldata-anonymized.csv")
+data_path <- here("data-analysis","data","v1","processed", "emogo-v1-alldata-anonymized.csv")
 d <- read_csv(data_path)
 d <- d %>%
   filter(
@@ -32,16 +32,16 @@ Adding columns to characterize participant choices.
 d <- d %>%
   mutate(
     trial_number = case_when(
-      trial_index<7 ~ trial_index,
-      trial_index<199 ~ 6+(trial_index-6)/2,
+      trial_index<8 ~ trial_index,
+      trial_index<199 ~ 7+(trial_index-7)/2,
       TRUE ~ trial_index-96
     )
   ) %>%
   relocate(trial_number,.after=trial_index) %>%
   mutate(
     test_trial_number = case_when(
-      trial_number<6 ~ NA_real_,
-      trial_number<102 ~ trial_number-5,
+      trial_number<7 ~ NA_real_,
+      trial_number<103 ~ trial_number-6,
       TRUE ~ NA_real_
     )
   ) %>%
@@ -80,6 +80,45 @@ d <- d %>%
   )
 ```
 
+## Check data
+
+```{r}
+attention_check <- d %>%
+  filter(trial_index %in% c(4,5)) %>%
+  mutate(
+    attention_check_correct_choice = case_when(
+      trial_index == 4 ~ "stimuli/horse.jpg",
+      trial_index == 5 ~ "stimuli/hammer.jpg"
+    ),
+    check_correct = ifelse(attention_check_correct_choice==choiceImage,1,0)
+  ) %>%
+  group_by(subject) %>%
+  summarize(
+    N=n(),
+    avg_correct = mean(check_correct)
+  )
+
+passed_attention_check <- attention_check %>%
+  filter(avg_correct ==1) %>%
+  pull(subject)
+
+d %>%
+  filter(subject %in% passed_attention_check) %>%
+  distinct(subject,structure_condition,match_condition) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+
+reward_rank <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(test_trial_number==96) %>%
+  select(subject,structure_condition,match_condition,score_after_trial)
+ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
+  geom_density()+
+  facet_wrap(~structure_condition)
+```
+
+
+
 ## Summarize
 
 ```{r}
@@ -106,7 +145,14 @@ summarize_by_block <- subject_by_block %>%
 summarize_by_block_by_condition <- subject_by_block %>%
   group_by(match_condition,structure_condition,explore_block) %>%
   summarize(
-    max_choice = mean(max_choice_percent)
+     N=n(),
+    max_choice = mean(max_choice_percent),
+    se = sqrt(var(max_choice_percent, na.rm = TRUE)/N),
+    ci=qt(0.975, N-1)*sd(max_choice_percent,na.rm=TRUE)/sqrt(N),
+    lower_ci=max_choice-ci,
+    upper_ci=max_choice+ci,
+    lower_se=max_choice-se,
+    upper_se=max_choice+se
   )
 ```
 
@@ -122,6 +168,19 @@ ggplot(subject_by_block,aes(explore_block,max_choice_percent, color=subject))+
   geom_vline(xintercept=6.5,linetype="dotted")+
   geom_hline(yintercept=0.25,linetype="dashed")+
   theme(legend.position="none")+
+  scale_x_continuous(breaks=seq(1,12))+
+  xlab("Block (8 Trials = 1 Block)")+
+  ylab("Percent reward-maximizing choices")
+
+ggplot(summarize_by_block_by_condition,aes(explore_block,max_choice, color=structure_condition,shape=match_condition,linetype=match_condition))+
+  geom_point(size=1.5,alpha=0.5)+
+  geom_line(alpha=0.5)+
+  geom_point(aes(y=max_choice),size=2)+
+  geom_line(aes(y=max_choice),size=1.2)+
+  geom_errorbar(aes(y=max_choice,ymin=lower_se,ymax=upper_se),width=0)+
+  geom_vline(xintercept=6.5,linetype="dotted")+
+  geom_hline(yintercept=0.25,linetype="dashed")+
+  #theme(legend.position="none")+
   scale_x_continuous(breaks=seq(1,12))+
   xlab("Block (8 Trials = 1 Block)")+
   ylab("Percent reward-maximizing choices")
@@ -159,7 +218,10 @@ d <- d %>%
   )
 
 #fit model
-m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
+# m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
+# summary(m)
+
+m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c+ (1+block_c|subject)+(1|choiceImage),data=d, family=binomial)
 summary(m)
 
 m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c+ (1+block_c|subject)+(1|choiceImage),data=d, family=binomial)

@@ -1,0 +1,5 @@
+"trial_type","trial_index","time_elapsed","internal_node_id","subject","workerId","hitId","assignmentId","structure_condition","match_condition","noise_type","success","timeout","failed_images","failed_audio","failed_video","view_history","rt"
+"pavlovia","0","11","0.0-0.0","p620727","AW0K78T4I2T72","3S1L4CQSFYBD9IN1W8PCJQ1H8N7AFE","3KIBXJ1WD70GES7AX4QSPI8GOBKOKA","model","mismatch","uniform","","","","","","",""
+"preload","1","50471","0.0-1.0","p620727","AW0K78T4I2T72","3S1L4CQSFYBD9IN1W8PCJQ1H8N7AFE","3KIBXJ1WD70GES7AX4QSPI8GOBKOKA","model","mismatch","uniform","true","false","[]","[]","[]","",""
+"fullscreen","2","56186","0.0-2.0","p620727","AW0K78T4I2T72","3S1L4CQSFYBD9IN1W8PCJQ1H8N7AFE","3KIBXJ1WD70GES7AX4QSPI8GOBKOKA","model","mismatch","uniform","true","","","","","",""
+"instructions","3","68761","0.0-3.0","p620727","AW0K78T4I2T72","3S1L4CQSFYBD9IN1W8PCJQ1H8N7AFE","3KIBXJ1WD70GES7AX4QSPI8GOBKOKA","model","mismatch","uniform","","","","","","[{""page_index"":0,""viewing_time"":12572.89999999851}]","12573.5"

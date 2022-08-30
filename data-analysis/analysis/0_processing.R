@@ -1,9 +1,9 @@
 library(here)
 library(tidyverse)
 
-data_directory <- here("data-analysis","data","pilot-v1","raw")
-processed_data_directory <- here("data-analysis","data","pilot-v1","processed")
-file_name <- "emogo-pilot-v1"
+data_directory <- here("data-analysis","data","v1","raw")
+processed_data_directory <- here("data-analysis","data","v1","processed")
+file_name <- "emogo-v1"
 
 merge_and_deidentify_data <- function(raw_data_directory, 
                                       merged_data_path, 
@@ -36,7 +36,7 @@ merge_and_deidentify_data <- function(raw_data_directory,
     select(-workerId)
   
   #keep cleaned data for verifying participation
-  write_csv(cleaned_data, here(merged_data_path,paste0(file_name,"alldata.csv")))
+  write_csv(cleaned_data, here(merged_data_path,paste0(file_name,"-alldata.csv")))
   
   #keep anonymized data
   write_csv(anonymized_data, here(merged_data_path,paste0(file_name,"-alldata-anonymized.csv")))
