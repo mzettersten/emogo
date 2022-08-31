@@ -77,7 +77,21 @@ d <- d %>%
       !is.na(test_trial_number) ~ 0,
       TRUE ~ NA_real_
     )
-  )
+  ) %>%
+  mutate(
+    cur_structure_condition=case_when(
+      test_trial_number < 49 ~ structure_condition,
+      !is.na(test_trial_number) & match_condition == "match" ~ structure_condition,
+       test_trial_number >= 49 & structure_condition == "emotion" ~ "model",
+      test_trial_number >= 49 & structure_condition == "model" ~ "emotion"
+    )
+  ) %>%
+  mutate(block = case_when(
+      test_trial_number < 49 ~ 1,
+      test_trial_number >= 49 ~ 2,
+      TRUE ~ NA_real_
+    ))
+  
 ```
 
 ## Check data
@@ -186,9 +200,9 @@ ggplot(summarize_by_block_by_condition,aes(explore_block,max_choice, color=struc
   ylab("Percent reward-maximizing choices")
 
 
-ggplot(subject_by_block,aes(explore_block,max_choice_percent, color=subject))+
-  geom_point(size=1.5)+
-  geom_line()+
+ggplot(subject_by_block,aes(explore_block,max_choice_percent, group=subject))+
+  #geom_point(size=1.5,alpha=0.5)+
+  geom_line(alpha=0.5)+
   geom_vline(xintercept=6.5,linetype="dotted")+
   geom_hline(yintercept=0.25,linetype="dashed")+
   theme(legend.position="none")+
@@ -207,6 +221,9 @@ d <- d %>%
     structure_condition_c = case_when(
       structure_condition == "model" ~ -0.5,
       structure_condition == "emotion" ~ 0.5),
+    cur_structure_condition_c = case_when(
+      cur_structure_condition == "model" ~ -0.5,
+      cur_structure_condition == "emotion" ~ 0.5),
     match_condition_c = case_when(
       match_condition == "match" ~ 0.5,
       match_condition == "mismatch" ~ -0.5
@@ -218,17 +235,31 @@ d <- d %>%
   )
 
 #fit model
-# m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
-# summary(m)
+#m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
+#m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_trial_number_c||subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa"))
 
-m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c+ (1+block_c|subject)+(1|choiceImage),data=d, family=binomial)
+## the above models don't converge - will go through the pruning process more rigorously
+
+m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_c*block_trial_number_c+ (1|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
+summary(m)
+```
+
+
+### Follow-up models
+
+trying to sort out how to look at individual conditions and blocks
+
+```{r}
+m <- glmer(max_reward_choice ~ cur_structure_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
 summary(m)
 
-m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_c+ (1+block_c|subject)+(1|choiceImage),data=d, family=binomial)
+m <- glmer(max_reward_choice ~ match_condition_c*block_trial_number_c*block_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
 summary(m)
 
-m <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
+m <- glmer(max_reward_choice ~ match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial)
 summary(m)
+m <- glmer(max_reward_choice ~ match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial)
+summary(m)#not really sure why there should be a match effect here... Noise?
 ```
 
 
