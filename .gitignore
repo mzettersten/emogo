@@ -166,3 +166,4 @@ data-analysis/data/v1/raw/emogo-v1_PARTICIPANT_SESSION_2022-08-29_21h28.42.168.c
 data-analysis/data/v1/all_data_preprocessing/emogo-v1-alldata-anonymized.csv
 data-analysis/data/v1/all_data_preprocessing/emogo-v1-alldata.csv
 data-analysis/data/v1/participants/emogo_v1_cloudresearch_list.csv
+data-analysis/data/v1/processed/workerId_top_50.csv

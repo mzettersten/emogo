@@ -1,8 +1,13 @@
 ---
 title: "Emogo V1 Analysis"
 author: "Martin Zettersten"
-date: '2022-08-29'
-output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -94,7 +99,9 @@ d <- d %>%
   
 ```
 
-## Check data
+## Check data {.tabset}
+
+### attention check
 
 ```{r}
 attention_check <- d %>%
@@ -115,22 +122,91 @@ attention_check <- d %>%
 passed_attention_check <- attention_check %>%
   filter(avg_correct ==1) %>%
   pull(subject)
+```
 
-d %>%
-  filter(subject %in% passed_attention_check) %>%
-  distinct(subject,structure_condition,match_condition) %>%
-  group_by(structure_condition,match_condition) %>%
-  tally()
+### Total time
 
+```{r}
+total_time <- d %>%
+  filter(trial_index==206) %>%
+  select(subject,time_elapsed) %>%
+  distinct() %>%
+  mutate(time_mins = time_elapsed/1000/60)
+
+#Minumum time
+min(total_time$time_mins)
+
+#Any subjects with times under 4 minutes?
+subjects_too_fast <- total_time %>%
+  filter(time_mins<4)
+
+subjects_too_fast %>%
+  pull(subject)
+```
+
+### Check image location selection
+
+```{r}
+percent_location_selections <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(subject,choiceLocation) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+#any frequencies above 80%?
+subjects_same_location_exclusion <- percent_location_selections %>%
+  filter(freq>0.8) 
+
+subjects_same_location_exclusion %>%
+  distinct(subject) %>%
+  pull(subject)
+```
+
+### Reward ranks
+
+```{r}
 reward_rank <- d %>%
   filter(subject %in% passed_attention_check) %>%
   filter(test_trial_number==96) %>%
   select(subject,structure_condition,match_condition,score_after_trial)
+
+median_score <- median(reward_rank$score_after_trial)
+
+ggplot(reward_rank,aes(x=score_after_trial))+
+  geom_histogram()+
+  geom_vline(xintercept = median_score)
+
 ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
   geom_density()+
   facet_wrap(~structure_condition)
+
+subjects_top_50 <- reward_rank %>%
+  filter(score_after_trial>=median_score) %>%
+  select(subject)
+
+write_csv(subjects_top_50,here("data-analysis","data","v1","processed","subjects_top_50.csv"))
+
+conditions_top_50 <- reward_rank %>%
+  filter(subject %in% subjects_top_50$subject) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+conditions_top_50
 ```
 
+### Final tally
+
+```{r}
+#exclude any participants who meet exclusion criteria
+d <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(!(subject %in% subjects_same_location_exclusion)) %>%
+  filter(!(subject %in% subjects_too_fast))
+
+d %>%
+  distinct(subject,structure_condition,match_condition) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+```
 
 
 ## Summarize
@@ -173,9 +249,9 @@ summarize_by_block_by_condition <- subject_by_block %>%
 ## Plots
 
 ```{r}
-ggplot(subject_by_block,aes(explore_block,max_choice_percent, color=subject))+
-  geom_point(size=1.5,alpha=0.5)+
-  geom_line(alpha=0.5)+
+ggplot(subject_by_block,aes(explore_block,max_choice_percent))+
+  geom_point(size=1.5,alpha=0.1,aes(group=subject))+
+  geom_line(alpha=0.1,aes(group=subject))+
   geom_point(data=summarize_by_block,aes(y=max_choice),size=2,color="black")+
   geom_line(data=summarize_by_block,aes(y=max_choice),size=1.2,color="black")+
   geom_errorbar(data=summarize_by_block,aes(y=max_choice,ymin=lower_se,ymax=upper_se),width=0,color="black")+
@@ -212,7 +288,9 @@ ggplot(subject_by_block,aes(explore_block,max_choice_percent, group=subject))+
   ylab("Percent reward-maximizing choices")
 ```
 
-## Model
+## Model {.tabset}
+
+### Main
 
 ```{r}
 #recenter vars
@@ -243,7 +321,6 @@ d <- d %>%
 m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_c*block_trial_number_c+ (1|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
 summary(m)
 ```
-
 
 ### Follow-up models
 
