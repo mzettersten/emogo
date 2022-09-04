@@ -246,6 +246,36 @@ summarize_by_block_by_condition <- subject_by_block %>%
   )
 ```
 
+### Summarize by different reward choices
+
+```{r}
+summarize_choice_by_trial <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(structure_condition, match_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    reward_8 = mean(reward_score_unadjusted==8),
+    reward_6 = mean(reward_score_unadjusted==6),
+    reward_4 = mean(reward_score_unadjusted==4),
+    reward_2 = mean(reward_score_unadjusted==2)
+  ) %>%
+  pivot_longer(cols = c(reward_8,reward_6,reward_4,reward_2),names_to = "reward",values_to = "percent_choice",names_prefix="reward_")
+
+summarize_choice_by_block <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(structure_condition, match_condition,explore_block) %>%
+  summarize(
+    N=n(),
+    reward_8 = mean(reward_score_unadjusted==8),
+    reward_6 = mean(reward_score_unadjusted==6),
+    reward_4 = mean(reward_score_unadjusted==4),
+    reward_2 = mean(reward_score_unadjusted==2)
+  ) %>%
+  pivot_longer(cols = c(reward_8,reward_6,reward_4,reward_2),names_to = "reward",values_to = "percent_choice",names_prefix="reward_")
+```
+
+
+
 ## Plots
 
 ```{r}
@@ -286,6 +316,24 @@ ggplot(subject_by_block,aes(explore_block,max_choice_percent, group=subject))+
   scale_x_continuous(breaks=seq(1,12))+
   xlab("Block (8 Trials = 1 Block)")+
   ylab("Percent reward-maximizing choices")
+
+ggplot(summarize_choice_by_trial,aes(test_trial_number,percent_choice,color=reward))+
+  geom_point()+
+  geom_line()+
+  geom_vline(xintercept=48.5,linetype="dotted")+
+  geom_hline(yintercept=0.25,linetype="dashed")+
+  xlab("Trial Number")+
+  ylab("Percent choices")+
+  facet_wrap(~structure_condition+match_condition)
+
+ggplot(summarize_choice_by_block,aes(explore_block,percent_choice,color=reward))+
+  geom_point()+
+  geom_line()+
+  geom_vline(xintercept=6.5,linetype="dotted")+
+  geom_hline(yintercept=0.25,linetype="dashed")+
+  xlab("Block (8 Trials = 1 Block)")+
+  ylab("Percent choices")+
+  facet_wrap(~structure_condition+match_condition)
 ```
 
 ## Model {.tabset}
