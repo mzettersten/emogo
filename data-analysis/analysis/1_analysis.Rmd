@@ -101,7 +101,21 @@ d <- d %>%
 
 ## Check data {.tabset}
 
-### attention check
+
+### Open ended responses
+
+```{r}
+open_resps <- d %>%
+  filter(trial_index %in% 206) %>%
+  select(subject, structure_condition, match_condition ,response) %>% 
+  extract(response, into = c("patterns", "strategy", "comments"),
+          regex = "patterns\":\"(.*)\",\"strategy\":\"(.*)\",\"comments\":\"(.*)")
+
+#write_csv(open_resps, here("data-analysis","data","v1","processed","emogo-v1-openresponses.csv"))
+```
+
+
+### Attention check
 
 ```{r}
 attention_check <- d %>%
