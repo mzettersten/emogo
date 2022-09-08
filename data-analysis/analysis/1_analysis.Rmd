@@ -397,8 +397,50 @@ summary(m)
 
 m <- glmer(max_reward_choice ~ match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial)
 summary(m)
+
 m <- glmer(max_reward_choice ~ match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial)
 summary(m)#not really sure why there should be a match effect here... Noise?
+```
+
+
+# SRCD 2023 abstract
+```{r}
+## learning block
+m <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial)
+summary(m)
+
+# re-run so I don't have to re-label things
+m <- glmer(max_reward_choice ~ structure_condition*block_trial_number+ (1+block_trial_number|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial)
+summary(m)
+
+sjPlot::plot_model(m, type = "pred", terms = c("block_trial_number", "structure_condition"),
+           show.data = T, 
+           jitter = .01, 
+           title = "",
+           axis.title = c("Trial", "Reward Maximizing Choices"),
+           legend.title = "Structure Condition",
+           colors = c( "orange3", "green4"),
+           auto.label = FALSE)+
+        theme_classic(base_size = 14, base_family = "")
+
+
+# generalization block 
+m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
+summary(m)
+
+## re-run for less re-labeling
+m <- glmer(max_reward_choice ~ structure_condition*match_condition*block_trial_number+ (1+block_trial_number|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
+summary(m)
+
+sjPlot::plot_model(m, type = "pred", terms = c("block_trial_number", "match_condition", "structure_condition"),
+                   show.data = T,
+                   jitter = .01,
+                   title = "Structure Condition",
+                   axis.title = c("Trial", "Reward Maximizing Choices"),
+                   legend.title = "Match Condition",
+                   colors = c( "firebrick", "darkblue")) +
+                  theme_classic(base_size = 14, base_family = "")
+
 ```
 
 
