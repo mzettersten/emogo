@@ -423,64 +423,22 @@ summary(m)#not really sure why there should be a match effect here... Noise?
 #            auto.label = FALSE)+
 #         theme_classic(base_size = 14, base_family = "")
 
-# overall
+# overall (same model as in section above)
 m <- glmer(max_reward_choice ~ cur_structure_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial)
 summary(m)
 
 # generalization block 
-m <- glmer(max_reward_choice ~ structure_condition_c*match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
+m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_trial_number_c+ (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
 summary(m)
 
-# ## re-run for less re-labeling
-# m <- glmer(max_reward_choice ~ structure_condition*match_condition*block_trial_number+ (1+block_trial_number|subject)+(1|choiceImage),data=filter(d,block==2), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=20000)))
-# summary(m)
-# 
-# sjPlot::plot_model(m, type = "pred", terms = c("block_trial_number", "match_condition", "structure_condition"),
-#                    show.data = T,
-#                    jitter = .01,
-#                    title = "Structure Condition",
-#                    axis.title = c("Trial", "Reward Maximizing Choices"),
-#                    legend.title = "Match Condition",
-#                    colors = c( "firebrick", "darkblue")) +
-#                   theme_classic(base_size = 14, base_family = "")
-
-#####
-subject_by_block <- d %>%
-  filter(!is.na(explore_block)) %>%
-  group_by(subject,match_condition,cur_structure_condition,explore_block) %>%
-  summarize(
-    max_choice_percent=mean(max_reward_choice)
-  )
-
-summarize_by_block_by_condition <- subject_by_block %>%
-  group_by(match_condition,cur_structure_condition,explore_block) %>%
-  summarize(
-     N=n(),
-    max_choice = mean(max_choice_percent),
-    se = sqrt(var(max_choice_percent, na.rm = TRUE)/N),
-    ci=qt(0.975, N-1)*sd(max_choice_percent,na.rm=TRUE)/sqrt(N),
-    lower_ci=max_choice-ci,
-    upper_ci=max_choice+ci,
-    lower_se=max_choice-se,
-    upper_se=max_choice+se
-  )
-
-ggplot(summarize_by_block_by_condition,aes(explore_block,max_choice, color=cur_structure_condition,shape=match_condition,linetype=match_condition))+
-  geom_point(size=1.5,alpha=0.5)+
-  geom_line(alpha=0.5)+
-  geom_point(aes(y=max_choice),size=2)+
-  geom_line(aes(y=max_choice),size=1.2)+
-  geom_errorbar(aes(y=max_choice,ymin=lower_se,ymax=upper_se),width=0)+
-  geom_vline(xintercept=6.5,linetype="dotted")+
-  geom_hline(yintercept=0.25,linetype="dashed")+
-  scale_linetype_manual(values=c(1,3), labels=c("Match","Mismatch"),name = "Match Condition")+
-  scale_shape_manual(values=c(1,2), labels=c("Match","Mismatch"),name = "Match Condition")+
-  scale_color_manual(values=c("orange","firebrick"), labels=c("Emotion","Model"),name = "Structure Condition")+
-   #theme(legend.position="none")+
-  scale_x_continuous(breaks=seq(1,12))+
-  xlab("Block (8 Trials = 1 Block)")+
-  ylab("Percent Reward-Maximizing Choices")+
-  theme_classic(base_size = 14)
+sjPlot::plot_model(m, type = "pred", terms = c("block_trial_number_c", "match_condition_c", "cur_structure_condition_c"),
+                   show.data = T,
+                   jitter = .01,
+                   title = "Structure Condition",
+                   axis.title = c("Trial", "Reward Maximizing Choices"),
+                   legend.title = "Match Condition",
+                   colors = c( "firebrick", "darkblue")) +
+                  theme_classic(base_size = 14, base_family = "")
 
 ```
 
