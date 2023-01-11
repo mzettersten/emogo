@@ -246,7 +246,7 @@ subjects_top_50 <- reward_rank %>%
   filter(score_after_trial>=median_score) %>%
   select(subject)
 
-write_csv(subjects_top_50,here("data-analysis","data","v1","processed","subjects_top_50.csv"))
+write_csv(subjects_top_50,here("data-analysis","data","v2","processed","subjects_top_50.csv"))
 
 conditions_top_50 <- reward_rank %>%
   filter(subject %in% subjects_top_50$subject) %>%
