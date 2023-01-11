@@ -1,0 +1,11 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/936474/2be65a59d8374d4aa32e8a6abd7eb9c6
+bundleId: https://api.rpubs.com/api/v1/document/936474/2be65a59d8374d4aa32e8a6abd7eb9c6
+url: http://rpubs.com/mzettersten/936474
+when: 1663460853.9993
+lastSyncTime: 1663460853.99935
