@@ -1,0 +1,17 @@
+base
+here
+tidyverse
+ggplot2
+tibble
+tidyr
+readr
+purrr
+dplyr
+stringr
+forcats
+viridisLite
+Matrix
+lme4
+ggstance
+cowplot
+AICcmodavg

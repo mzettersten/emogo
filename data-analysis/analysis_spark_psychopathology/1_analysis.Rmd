@@ -21,8 +21,13 @@ library(cowplot)
 library(AICcmodavg)
 
 
+<<<<<<< Updated upstream
 data_path <- here("data-analysis","data","spark-psychopathology","processed", "emogo-spark-psychopathology-alldata-anonymized.csv")
 figure_path <- here("data-analysis","analysis","figures")
+=======
+data_path <- here("data-analysis", "data","spark-psychopathology","processed", "emogo-spark-psychopathology-alldata-anonymized.csv")
+figure_path <- here("data-analysis","analysis_spark_personality","figures")
+>>>>>>> Stashed changes
 ```
 
 # Data Processing
@@ -242,9 +247,9 @@ ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
   geom_density()+
   facet_wrap(~structure_condition)
 
-subjects_top_50 <- reward_rank %>%
-  filter(score_after_trial>=median_score) %>%
-  select(subject)
+subjects_top_50 <- reward_rank %>% 
+  arrange(desc(reward_rank)) %>% 
+  slice_head(n = 50)
 
 write_csv(subjects_top_50,here("data-analysis","data","spark-psychopathology","processed","subjects_top_50.csv"))
 
@@ -429,7 +434,7 @@ ggsave(here(figure_path,"overall_reward_maximizing.png"),width=6,height=6)
 
 ### Overall
 
-```{r, cache=TRUE, eval=FALSE}
+```{r, cache=TRUE, eval=TRUE}
 #### Pruning random effects structure
 #maximal random effects structure
 m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
@@ -438,7 +443,7 @@ summary(m)
 
 ### Plot
 
-```{r,eval=FALSE}
+```{r,eval=TRUE}
 #create predicted data
 pX <- expand.grid(
   cur_structure_condition_c=c(-0.5,0.5),
@@ -507,7 +512,7 @@ ggsave(here(figure_path,"model_predictions.png"),width=9,height=6)
 
 #### Generalization Condition Only
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
 p <- ggplot(subset(d,!is.na(block_trial_number)&block==2),aes(block_trial_number,as.factor(max_reward_choice),color=cur_structure_condition))+
       geom_point(size = 0.5, alpha=0.1,shape=19,position  = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
       geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==-0.5&block==2),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.4,alpha=0.2,color=NA)+
@@ -540,7 +545,7 @@ ggsave(here(figure_path,"model_prediction_generalization_only.pdf"),width=9,heig
 
 Recenter the model on the learning block
 
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_learn*block_trial_number_c+ (1+block_learn*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 summary(m)
 ```
@@ -549,12 +554,14 @@ summary(m)
 
 Recenter the model on the generalization block
 
-```{r, cache=TRUE,eval=FALSE}
+```{r, cache=TRUE,eval=TRUE}
 m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_gen*block_trial_number_c+ (1+block_gen*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 summary(m)
 ```
 
 ## Various Exploratory Follow-up models {.tabset}
+
+Not evaluated for spark-psychopathology
 
 ### Lower Order Models
 
