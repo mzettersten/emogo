@@ -243,8 +243,8 @@ ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
   facet_wrap(~structure_condition)
 
 subjects_top_50 <- reward_rank %>% 
-  arrange(desc(score_after_trial)) %>% 
-  slice_head(n = 50)
+  group_by(structure_condition,match_condition) %>%
+  slice_max(score_after_trial,n = 13)
 
 write_csv(subjects_top_50,here("data-analysis","data","spark-personality","processed","subjects_top_50.csv"))
 
