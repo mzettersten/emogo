@@ -242,8 +242,9 @@ ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
   geom_density()+
   facet_wrap(~structure_condition)
 
-subjects_top_50 <- reward_rank %>%
-  filter(score_after_trial>=median_score) %>%
+subjects_top_50 <- reward_rank %>% 
+  arrange(desc(score_after_trial)) %>% 
+  slice_head(n = 50) %>%
   select(subject)
 
 write_csv(subjects_top_50,here("data-analysis","data","v2","processed","subjects_top_50.csv"))
