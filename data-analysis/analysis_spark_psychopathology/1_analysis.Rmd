@@ -1,5 +1,5 @@
 ---
-title: "Emogo V1 Analysis"
+title: "Emogo Spark Psychopathology Analysis"
 author: "Martin Zettersten"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 output:
@@ -21,13 +21,9 @@ library(cowplot)
 library(AICcmodavg)
 
 
-<<<<<<< Updated upstream
-data_path <- here("data-analysis","data","spark-psychopathology","processed", "emogo-spark-psychopathology-alldata-anonymized.csv")
-figure_path <- here("data-analysis","analysis","figures")
-=======
+
 data_path <- here("data-analysis", "data","spark-psychopathology","processed", "emogo-spark-psychopathology-alldata-anonymized.csv")
 figure_path <- here("data-analysis","analysis_spark_personality","figures")
->>>>>>> Stashed changes
 ```
 
 # Data Processing
@@ -248,7 +244,7 @@ ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
   facet_wrap(~structure_condition)
 
 subjects_top_50 <- reward_rank %>% 
-  arrange(desc(reward_rank)) %>% 
+  arrange(desc(score_after_trial)) %>% 
   slice_head(n = 50)
 
 write_csv(subjects_top_50,here("data-analysis","data","spark-psychopathology","processed","subjects_top_50.csv"))
