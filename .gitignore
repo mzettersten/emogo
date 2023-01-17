@@ -965,3 +965,5 @@ data-analysis/data/v2/raw/emogo-v2_PARTICIPANT_SESSION_2022-12-01_22h36.53.61.cs
 data-analysis/data/v2/raw/emogo-v2_PARTICIPANT_SESSION_2022-12-02_08h47.24.199.csv
 data-analysis/data/v2/raw/emogo-v2_PARTICIPANT_SESSION_2022-12-02_08h47.26.566.csv
 data-analysis/data/spark-personality/processed/emogo-spark-personality-alldata.csv
+data-analysis/data/spark-personality/processed/spark-personality-workerId_top_50.csv
+data-analysis/data/spark-psychopathology/processed/spark-psychopathology-workerId_top_50.csv
