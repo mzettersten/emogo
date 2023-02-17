@@ -155,7 +155,7 @@ d <- d %>%
 
 ```{r}
 open_resps <- d %>%
-  filter(trial_index %in% 206) %>%
+  filter(trial_index %in% 265) %>%
   select(subject, structure_condition, match_condition ,response) %>% 
   extract(response, into = c("patterns", "strategy", "comments"),
           regex = "patterns\":\"(.*)\",\"strategy\":\"(.*)\",\"comments\":\"(.*)")
@@ -353,6 +353,28 @@ summarize_choice_by_subject$block_name <- factor(summarize_choice_by_subject$blo
 
 ```
 
+# Emotion Ratings
+```{r}
+ratings <- d %>%
+  filter(trial_index > 200 & trial_index < 265) %>%
+  mutate(trial_type_cod = ifelse(trial_type == "survey-text", "emo_word", "intensity")) %>%
+  select(subject, structure_condition, match_condition, trial_type_cod, simulus_image ,response) %>%
+  pivot_wider(names_from = trial_type_cod, values_from = response) %>%
+  extract(emo_word, into = "emo_word",
+          regex = "Q0\":\"(.*)\"}") %>%
+  mutate(
+    emo_type = case_when(
+      simulus_image== ~ "generalization block",
+      simulus_image==1~"learning block"
+    ))
+
+
+
+
+```
+
+
+
 # Analysis
 
 ## Plots
@@ -376,7 +398,8 @@ ggplot(summarize_by_block_by_condition,aes(explore_block,max_choice, color=struc
   geom_line(alpha=0.5)+
   geom_point(aes(y=max_choice),size=2)+
   geom_line(aes(y=max_choice),size=1.2)+
-  geom_errorbar(aes(y=max_choice,ymin=lower_se,ymax=upper_se),width=0)+
+
+    geom_errorbar(aes(y=max_choice,ymin=lower_se,ymax=upper_se),width=0)+
   geom_vline(xintercept=6.5,linetype="dotted")+
   geom_hline(yintercept=0.25,linetype="dashed")+
   #theme(legend.position="none")+
