@@ -26,16 +26,16 @@ library(AICcmodavg)
 ## Read in data
 
 ```{r}
-d_v1 <- read_csv("emogo-v1-alldata-anonymized.csv") %>%
+d_v1 <- read_csv(here("data-analysis", "data","v1","processed","emogo-v1-alldata-anonymized.csv")) %>%
   mutate(task_version = "v1")
 
-d_v2 <- read_csv("emogo-v2-alldata.csv") %>%
+d_v2 <- read_csv(here("data-analysis", "data","v2","processed","emogo-v2-alldata.csv")) %>%
   mutate(task_version = "v2")
 
-d_pers <- read_csv("emogo-spark-personality-alldata-anonymized.csv") %>%
+d_pers <- read_csv(here("data-analysis", "data","spark-personality","processed","emogo-spark-personality-alldata-anonymized.csv")) %>%
   mutate(task_version = "spark-personality")
 
-d_psych <- read_csv("emogo-spark-psychopathology-alldata-anonymized.csv") %>%
+d_psych <- read_csv(here("data-analysis", "data","spark-psychopathology","processed","emogo-spark-psychopathology-alldata-anonymized.csv")) %>%
   mutate(task_version = "spark-psychopathology")
 
 d <- d_v1 %>%
