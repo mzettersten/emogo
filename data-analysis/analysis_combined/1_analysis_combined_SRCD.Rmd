@@ -1,0 +1,847 @@
+---
+title: "Emogo Combined Analysis"
+author: "Rista Plate via Martin Zettersten"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+
+```{r setup, include=FALSE}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(viridisLite)
+library(lme4)
+library(ggstance)
+library(cowplot)
+library(AICcmodavg)
+```
+
+# Data Processing
+
+## Read in data
+
+```{r}
+d_v1 <- read_csv("emogo-v1-alldata-anonymized.csv") %>%
+  mutate(task_version = "v1")
+
+d_v2 <- read_csv("emogo-v2-alldata.csv") %>%
+  mutate(task_version = "v2")
+
+d_pers <- read_csv("emogo-spark-personality-alldata-anonymized.csv") %>%
+  mutate(task_version = "spark-personality")
+
+d_psych <- read_csv("emogo-spark-psychopathology-alldata-anonymized.csv") %>%
+  mutate(task_version = "spark-psychopathology")
+
+d <- d_v1 %>%
+  full_join(d_v2) %>%
+  full_join(d_pers) %>%
+  full_join(d_psych)
+
+
+d <- d %>%
+  filter(
+    !(trial_type %in% c("show-reward"))
+  )
+
+length(unique(d$subject))
+```
+
+## Adding some useful columns
+
+Adding columns to characterize participant choices.
+
+```{r}
+d <- d %>%
+  mutate(
+    trial_number = case_when(
+      trial_index<8 ~ trial_index,
+      trial_index<199 ~ 7+(trial_index-7)/2,
+      TRUE ~ trial_index-96
+    )
+  ) %>%
+  relocate(trial_number,.after=trial_index) %>%
+  mutate(
+    test_trial_number = case_when(
+      trial_number<7 ~ NA_real_,
+      trial_number<103 ~ trial_number-6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  relocate(test_trial_number,.after=trial_number) %>%
+  mutate(
+    block_trial_number = case_when(
+      test_trial_number < 49 ~ test_trial_number,
+      TRUE ~ test_trial_number - 48),
+    block_trial_number_c = block_trial_number - 24.5
+  ) %>%
+  relocate(block_trial_number,.after=test_trial_number) %>%
+  relocate(block_trial_number_c,.after=block_trial_number) %>%
+  mutate(
+    explore_block = case_when(
+      test_trial_number<9 ~ 1,
+      test_trial_number<17 ~ 2,
+      test_trial_number<25 ~ 3,
+      test_trial_number<33 ~ 4,
+      test_trial_number < 41 ~ 5,
+      test_trial_number < 49 ~ 6,
+      test_trial_number < 57 ~ 7,
+      test_trial_number<65 ~ 8,
+      test_trial_number<73 ~ 9,
+      test_trial_number<81 ~ 10,
+      test_trial_number <89 ~ 11,
+      test_trial_number <97 ~ 12,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    max_reward_choice = case_when(
+      reward_score_unadjusted ==8 ~ 1,
+      !is.na(test_trial_number) ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    cur_structure_condition=case_when(
+      test_trial_number < 49 ~ structure_condition,
+      !is.na(test_trial_number) & match_condition == "match" ~ structure_condition,
+       test_trial_number >= 49 & structure_condition == "emotion" ~ "model",
+      test_trial_number >= 49 & structure_condition == "model" ~ "emotion"
+    )
+  ) %>%
+  mutate(block = case_when(
+      test_trial_number < 49 ~ 1,
+      test_trial_number >= 49 ~ 2,
+      TRUE ~ NA_real_
+    ))
+
+#recenter vars
+d <- d %>%
+  mutate(
+    structure_condition_c = case_when(
+      structure_condition == "model" ~ -0.5,
+      structure_condition == "emotion" ~ 0.5),
+    cur_structure_condition_c = case_when(
+      cur_structure_condition == "model" ~ -0.5,
+      cur_structure_condition == "emotion" ~ 0.5),
+    match_condition_c = case_when(
+      match_condition == "match" ~ 0.5,
+      match_condition == "mismatch" ~ -0.5
+    ),
+    cur_structure_condition_model = case_when(
+      cur_structure_condition == "model" ~ 0,
+      cur_structure_condition == "emotion" ~ 1),
+    cur_structure_condition_emotion = case_when(
+      cur_structure_condition == "model" ~ -1,
+      cur_structure_condition == "emotion" ~ 0),
+    match_condition_match = case_when(
+      match_condition == "match" ~ 0,
+      match_condition == "mismatch" ~ -1
+    ),
+    match_condition_mismatch = case_when(
+      match_condition == "match" ~ 1,
+      match_condition == "mismatch" ~ 0
+    ),
+    block_c = case_when(
+      test_trial_number < 49 ~ -0.5,
+      TRUE ~ 0.5
+    ),
+    block_learn = case_when(
+      block==1 ~ 0,
+      block==2 ~ 1
+    ),
+    block_gen = case_when(
+      block==1 ~ -1,
+      block==2 ~ 0
+    )
+  )
+```
+
+## Check data {.tabset}
+
+
+### Open ended responses
+
+```{r}
+open_resps <- d %>%
+  filter(grepl("patterns",response)) %>%
+  select(subject, structure_condition, match_condition ,response) %>% 
+  extract(response, into = c("patterns", "strategy", "comments"),
+          regex = "patterns\":\"(.*)\",\"strategy\":\"(.*)\",\"comments\":\"(.*)")
+
+#write_csv(open_resps, "emogo_combined_open_resps.csv")
+```
+
+
+### Attention check
+
+```{r}
+attention_check <- d %>%
+  filter(trial_index %in% c(4,5)) %>%
+  mutate(
+    attention_check_correct_choice = case_when(
+      trial_index == 4 ~ "stimuli/horse.jpg",
+      trial_index == 5 ~ "stimuli/hammer.jpg"
+    ),
+    check_correct = ifelse(attention_check_correct_choice==choiceImage,1,0)
+  ) %>%
+  group_by(subject) %>%
+  summarize(
+    N=n(),
+    avg_correct = mean(check_correct)
+  )
+
+passed_attention_check <- attention_check %>%
+  filter(avg_correct ==1) %>%
+  pull(subject)
+```
+
+### Total time
+
+```{r}
+total_time <- d %>%
+  filter(trial_index==206) %>%
+  select(subject,time_elapsed) %>%
+  distinct() %>%
+  mutate(time_mins = time_elapsed/1000/60)
+
+#Minumum time
+min(total_time$time_mins)
+
+#Any subjects with times under 4 minutes?
+subjects_too_fast <- total_time %>%
+  filter(time_mins<4)
+
+subjects_too_fast %>%
+  pull(subject)
+```
+
+### Check image location selection
+
+```{r}
+percent_location_selections <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(subject,choiceLocation) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+#any frequencies above 80%?
+subjects_same_location_exclusion <- percent_location_selections %>%
+  filter(freq>0.8) 
+
+subjects_same_location_exclusion %>%
+  distinct(subject) %>%
+  pull(subject)
+```
+
+### Reward ranks
+
+```{r}
+reward_rank <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(test_trial_number==96) %>%
+  select(subject,structure_condition,match_condition,score_after_trial)
+
+median_score <- median(reward_rank$score_after_trial)
+
+ggplot(reward_rank,aes(x=score_after_trial))+
+  geom_histogram()+
+  geom_vline(xintercept = median_score)
+
+ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
+  geom_density()+
+  facet_wrap(~structure_condition)
+
+subjects_top_50 <- reward_rank %>%
+  filter(score_after_trial>=median_score) %>%
+  select(subject)
+
+#write_csv(subjects_top_50,here("data-analysis","data","v1","processed","subjects_top_50.csv"))
+
+conditions_top_50 <- reward_rank %>%
+  filter(subject %in% subjects_top_50$subject) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+conditions_top_50
+```
+
+### Final tally
+
+```{r}
+#exclude any participants who meet exclusion criteria
+d <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(!(subject %in% subjects_same_location_exclusion)) %>%
+  filter(!(subject %in% subjects_too_fast))
+
+d %>%
+  distinct(subject,structure_condition,match_condition) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+```
+
+# SRCD
+
+
+## Emotion
+```{r}
+d_graph <- d %>%
+  filter(test_trial_number < 49)%>%
+  mutate(choiceValence = ifelse(choiceEmotion == "CC" | choiceEmotion == "HE" | choiceEmotion == "HO" | choiceEmotion == "SUR", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad")) %>%
+  mutate(choiceGender = ifelse(grepl('M',choiceModel), "male", "female")) %>%
+  mutate(choiceRace = ifelse(grepl('A',choiceModel),"Asian",
+                             ifelse(grepl('B',choiceModel),"Black",
+                                    ifelse(grepl('H',choiceModel),"Hispanic", "White")))) %>%
+  mutate(choiceValence_C = ifelse(choiceValence ==  "positive emotions (calm, happy, exuberent, surprise)", .5, -.5))
+  
+d_get_reward_emo <- d_graph %>%
+  filter(structure_condition == "emotion") %>%
+  filter(reward_score_unadjusted == 8) %>%
+  mutate(rewEmotion = choiceEmotion) %>%
+  distinct(subject, task_version, rewEmotion)
+
+d_graph_emotion <- d_graph %>%
+  full_join(d_get_reward_emo) %>%
+  mutate(rewEmotion = ifelse(grepl('AO',rewEmotion),"angry",
+                           ifelse(grepl('CC',rewEmotion),"calm",
+                           ifelse(grepl('DO',rewEmotion),"disgust",
+                           ifelse(grepl('FO',rewEmotion),"fear",
+                           ifelse(grepl('HE',rewEmotion),"exuberent",
+                           ifelse(grepl('HO',rewEmotion),"happy",
+                           ifelse(grepl('SC',rewEmotion),"sad","surprise")))))))) %>%
+  mutate(rewEmotion_inclModel = ifelse(d_graph$structure_condition == "model", "model", rewEmotion)) %>%
+ drop_na(rewEmotion_inclModel) %>%
+  mutate(rewEmoValence = ifelse(rewEmotion_inclModel == "model", "model",
+         ifelse(rewEmotion == "calm" | rewEmotion == "exuberent" | rewEmotion == "happy" | rewEmotion == "surprise", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad)"))) %>%
+  mutate(rewEmoHAPPY_EX = ifelse(rewEmotion_inclModel == "model", "model",
+                                 ifelse(rewEmotion == "exuberent" | rewEmotion == "happy" , "happy emotions (happy, exuberent)", "not happy emotions")) )
+
+length(unique(d_graph_emotion$subject))
+table(d_graph_emotion$rewEmotion_inclModel)
+
+color1 <- "#2B959A"
+color2 <-"#D6692A"
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = structure_condition))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  #scale_color_manual(name="Structure Condition")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")+
+  facet_grid(~ rewEmotion_inclModel) +
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  #scale_color_manual(name="Structure Condition")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  legend.position = "none",
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+  
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoValence))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  scale_color_manual(values = c("blue", "darkred", "darkgreen"))+
+  xlab("Trial Number")+
+  ylab("chose best option") 
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoHAPPY_EX))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c("darkgreen", "blue", "darkred"), labels=c("Happy & Exhuberent","Model", "All Other Emotions"),name=" ")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+```
+
+```{r}
+m <- glmer(max_reward_choice ~ cur_structure_condition_c*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_graph, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m)
+
+plot_model(m, type = "pred", terms = c("block_trial_number_c", "cur_structure_condition_c"))
+
+m_emotion_val <- glmer(max_reward_choice ~ rewEmoValence*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_graph_emotion, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_emotion_val)
+emmeans::emmeans (m_emotion_val, pairwise ~ rewEmoValence)
+emmeans::emmeans (m_emotion_val, pairwise ~ rewEmoValence | block_trial_number_c, at = list(block_trial_number_c = .5 + 4:6))
+
+plot_model(m_emotion_val, type = "pred", terms = c("block_trial_number_c", "rewEmoValence"))
+
+m_emotion_val_h.e <- glmer(max_reward_choice ~ rewEmoHAPPY_EX*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_graph_emotion, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_emotion_val_h.e)
+
+plot_model(m_emotion_val_h.e, type = "pred", terms = c("block_trial_number_c", "rewEmoHAPPY_EX"))
+
+
+m_emotion_spec_emo <- glmer(max_reward_choice ~ rewEmotion_inclModel*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_graph_emotion, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_emotion_spec_emo)
+
+plot_model(m_emotion_spec_emo, type = "pred", terms = c("block_trial_number_c", "rewEmotion_inclModel"))
+
+```
+
+## Consistency
+
+#### broad emotion
+```{r}
+d_nameability <- read_csv("emogo-combined-nameability.csv") %>%
+  mutate(model_emotion = image) %>%
+  separate(image, into = c("model", "emotion"), sep = "_", convert = TRUE) %>%
+  mutate(`modal response (32 models)` =                          
+           ifelse(grepl('calm',modal_response) |
+                    grepl('neut',modal_response),"calm, neutral",  ifelse(grepl('happ',modal_response),"happiness",
+                           ifelse(grepl('sad',modal_response),"sad",
+                           ifelse(grepl('fear',modal_response),"fear, scared",
+                           ifelse(grepl('shock',modal_response) |
+                    grepl('surp',modal_response),"shock, surprise",modal_response)))))) %>%
+  mutate(emo_name = ifelse(grepl('AO',emotion),"angry",
+                           ifelse(grepl('CC',emotion),"calm",
+                           ifelse(grepl('DO',emotion),"disgust",
+                           ifelse(grepl('FO',emotion),"fear",
+                           ifelse(grepl('HE',emotion),"exuberent",
+                           ifelse(grepl('HO',emotion),"happy",
+                           ifelse(grepl('SC',emotion),"sad","surprise")))))))) %>%
+  mutate(rewEmotion = emo_name)
+
+ggplot(d_nameability, aes(simpson_diversity, fill = emo_name)) +
+   geom_histogram() +
+    #facet_grid(~ emo_name)+
+  theme_bw()+labs(x="Consistency \n(Simpson Diversity)",y="Count", title = " ")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=24, family="Times"))+
+  guides(linetype=guide_legend(override.aes=list(alpha=1)))
+
+ggplot(d_nameability, aes(simpson_diversity, after_stat(density), colour = emo_name)) +
+  geom_freqpoly()
+
+ggplot(data = d_nameability) + 
+  geom_bar(mapping = aes(x = emo_name, fill = `modal response (32 models)`))+
+  theme_bw()+labs(x="Emotion Signal",y="Modal Response (per Image)", title = " ")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=24, family="Times"))+
+  guides(linetype=guide_legend(override.aes=list(alpha=1)))
+
+d_name_join <- d_nameability %>%
+  select(rewEmotion, simpson_diversity) %>%
+  group_by(rewEmotion) %>%
+  summarise(avg_simpson_diversity = mean(simpson_diversity)) %>%
+  right_join(d_graph_emotion) %>%
+  filter(structure_condition_c == .5)
+
+m_consistency <- glmer(max_reward_choice ~ block_trial_number_c*avg_simpson_diversity + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_name_join, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_consistency)
+
+sjPlot::plot_model(m_consistency, type = "pred", terms = c("block_trial_number_c", "avg_simpson_diversity"))
+```
+
+#### specific models
+```{r}
+### need to get simpson diversity for specific model
+d_nameability_sub <- d_nameability %>%
+  mutate(rewImage = model_emotion) %>%
+  select(rewImage, simpson_diversity)
+
+d_graph_emotion_sub <- d_graph_emotion %>%
+  select(subject, structure_condition, structure_condition_c, block_trial_number, block_trial_number_c, choiceEmotion, choiceModel, reward_score_unadjusted, task_version, max_reward_choice, image1:image4, rewards_unadjusted) %>%
+  unite(model_emotion, choiceModel, choiceEmotion, sep = "_")%>%
+  separate(rewards_unadjusted, c("rew_image1", "rew_image2", "rew_image3", "rew_image4"), sep = ",") %>%
+  mutate(rewImage = ifelse(grepl(8, rew_image1), image1,
+                           ifelse(grepl(8, rew_image2), image2,
+                                  ifelse(grepl(8, rew_image3), image3,
+                                         ifelse(grepl(8, rew_image4), image4,"FAIL"))))) %>%
+  separate(rewImage, c("junk", "rewImage"), sep = "/") %>%
+  separate(rewImage, c("rewImage", "junkToo"), sep = ".j") %>%
+  select(-junk, -junkToo) %>%
+  left_join(d_nameability_sub)
+  
+
+m_cons_spec <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*simpson_diversity + (1+block_trial_number_c|subject),data=d_graph_emotion_sub, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_cons_spec)
+
+sjPlot::plot_model(m_cons_spec, type = "pred", terms = c("block_trial_number_c", "simpson_diversity", "structure_condition_c"))
+
+hist(d_graph_emotion_sub$simpson_diversity)
+
+m_cons_spec_emo <- glmer(max_reward_choice ~ block_trial_number_c*simpson_diversity + (1+block_trial_number_c|subject),data=filter(d_graph_emotion_sub, structure_condition_c == .5), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_cons_spec_emo)
+
+sjPlot::plot_model(m_cons_spec_emo, type = "pred", terms = c("block_trial_number_c", "simpson_diversity"))
+
+
+####
+color1 <- "#2B959A"
+color2 <-"#D6692A"
+
+median(d_graph_emotion_sub$simpson_diversity, na.rm = TRUE)
+d_graph_emotion_sub$simpson_diversity_split <- ifelse(d_graph_emotion_sub$simpson_diversity < .25, "low", "high")
+
+d_graph <- d_graph_emotion_sub %>%
+  drop_na(simpson_diversity_split)
+
+ggplot(d_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = simpson_diversity_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option", title = " ")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name=" Label Consistency \nAcross Participants") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+```
+
+
+## ind diffs
+```{r}
+d_match_pers <- read_csv("data/emogo-spark-personality-alldata.csv") %>%
+  select(subject, workerId) %>%
+  distinct()
+
+# at some point need to figure out why these are different numbers
+length(unique(d_match_pers$workerId))
+length(unique(d_match_pers$subject))
+
+d_match_psych <- read_csv("data/emogo-spark-psychopathology-alldata.csv") %>%
+  select(subject, workerId) %>%
+  distinct()
+
+length(unique(d_match_psych$workerId))
+length(unique(d_match_psych$subject))
+
+d_match <- d_match_psych %>%
+  full_join(d_match_pers)
+
+d_pers <- read_csv("Qualtrics_data/SPARK_P_Emogo_CleanConstructsOnly.csv")
+
+d_psych <- read_csv("Qualtrics_data/SPARK_Psycho_Emogo_ConstructsOnly.csv")
+
+d_join <- d_pers %>%
+  full_join(d_psych) %>%
+  full_join(d_match) %>%
+  select(subject, P_STAR:P_TF_BOLD_SCORE)
+
+d_combo <- d_graph   %>%
+  filter(task_version == "spark-personality" | task_version == "spark-psychopathology") %>%
+  select(subject, task_version, block_trial_number, block_trial_number_c, structure_condition, structure_condition_c, max_reward_choice, choiceImage) %>%
+  left_join(d_join) 
+```
+
+### center continuous vars
+```{r}
+d_combo <- d_combo %>%
+  mutate(P_STAR_STS_c = P_STAR_STS-mean(P_STAR_STS, na.rm = TRUE),
+         P_STAR_SA_c = P_STAR_SA - mean(P_STAR_SA, na.rm =TRUE),
+         P_NEO_AGREE_c = P_NEO_AGREE - mean(P_NEO_AGREE, na.rm =TRUE),
+         P_NEO_OPEN_c = P_NEO_OPEN - mean(P_NEO_OPEN, na.rm =TRUE),
+         P_NEO_NEURO_c = P_NEO_NEURO - mean(P_NEO_NEURO, na.rm =TRUE),
+         P_NEO_EXTRA_c = P_NEO_EXTRA - mean(P_NEO_EXTRA, na.rm =TRUE),
+         P_FFI_CONSCI_c = P_FFI_CONSCI - mean(P_FFI_CONSCI, na.rm =TRUE),
+         P_PID_ANTAG_DOMAIN_c = P_PID_ANTAG_DOMAIN - mean(P_PID_ANTAG_DOMAIN, na.rm = TRUE),
+         P_TRIPM_MEAN_c = P_TRIPM_MEAN - mean(P_TRIPM_MEAN, na.rm = TRUE),
+         P_SRP_c = P_SRP - mean(P_SRP, na.rm = TRUE),
+         P_SRP_AF_c = P_SRP_AF - mean(P_SRP_AF, na.rm = TRUE))
+
+
+d_combo_pers <- d_combo %>%
+  filter(task_version == "spark-personality")
+length(unique(d_combo_pers$subject))
+
+d_combo_psych <- d_combo %>%
+  filter(task_version == "spark-psychopathology")
+length(unique(d_combo_psych$subject))
+
+
+d_combo_social <- d_combo %>%
+  filter(structure_condition_c == .5)
+
+d_agg <- d_combo_social %>%
+  group_by(subject) %>%
+  summarise(mean_max = mean(max_reward_choice, na.rm = TRUE)) %>%
+  left_join(d_join) %>%
+  select(-subject)
+
+d_table <- as_tibble(corx::corx(d_agg))
+
+```
+
+
+### ind diffs models
+
+#### SRP
+```{r}
+m <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_SRP_AF_c + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m)
+
+sjPlot::plot_model(m, type = "pred", terms = c("block_trial_number_c", "P_SRP_AF_c", "structure_condition_c"))
+
+####
+color1 <- "#2B959A"
+color2 <-"#D6692A"
+
+median(d_combo_pers$P_SRP_AF, na.rm = TRUE)
+d_combo_pers$P_SRP_AF_split <- ifelse(d_combo_pers$P_SRP < 2, "high", "low")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_SRP_AF_split)
+
+srp_graph <- ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_SRP_AF_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option", title = "Affect. Functioning (SRP-AF)")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name=" ") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+```
+
+#### personality models
+```{r}
+## openness
+m_open <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_NEO_OPEN_c + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_open)
+
+sjPlot::plot_model(m_open, type = "pred", terms = c("block_trial_number_c", "P_NEO_OPEN_c", "structure_condition_c"))
+
+## agreeableness
+m_agree <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_NEO_AGREE_c + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_agree)
+
+sjPlot::plot_model(m_agree, type = "pred", terms = c("block_trial_number_c", "P_NEO_AGREE_c", "structure_condition_c"))
+
+## extraversion
+m_extra <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_NEO_EXTRA_c + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_extra)
+
+sjPlot::plot_model(m_extra, type = "pred", terms = c("block_trial_number_c", "P_NEO_EXTRA_c", "structure_condition_c"))
+
+## neuroticism
+m_neuro <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_NEO_NEURO_c + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_neuro)
+
+sjPlot::plot_model(m_neuro, type = "pred", terms = c("block_trial_number_c", "P_NEO_NEURO_c", "structure_condition_c"))
+
+## conscientiousness
+m_consci <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_FFI_CONSCI_c + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_consci)
+
+sjPlot::plot_model(m_consci, type = "pred", terms = c("block_trial_number_c", "P_FFI_CONSCI_c", "structure_condition_c"))
+
+
+#### agreeable
+
+hist(d_combo_pers$P_NEO_AGREE, na.rm = TRUE)
+
+median(d_combo_pers$P_NEO_AGREE, na.rm = TRUE)
+d_combo_pers$P_NEO_AGREE_split <- ifelse(d_combo_pers$P_NEO_AGREE < 2.7, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_NEO_AGREE_split)
+
+agree_graph <- ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_NEO_AGREE_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option", title = "Agreeableness (NEO-FFI)")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name=" ") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+#### openness
+
+hist(d_combo_pers$P_NEO_OPEN, na.rm = TRUE)
+
+median(d_combo_pers$P_NEO_OPEN, na.rm = TRUE)
+d_combo_pers$P_NEO_OPEN_split <- ifelse(d_combo_pers$P_NEO_OPEN < 2.6, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_NEO_OPEN_split)
+
+ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_NEO_OPEN_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name="Openness") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+#### extraversion
+
+hist(d_combo_pers$P_NEO_EXTRA, na.rm = TRUE)
+
+median(d_combo_pers$P_NEO_EXTRA, na.rm = TRUE)
+d_combo_pers$P_NEO_EXTRA_split <- ifelse(d_combo_pers$P_NEO_EXTRA < 2, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_NEO_EXTRA_split)
+
+ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_NEO_EXTRA_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name="Extraversion") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+
+#### neuroticism
+
+hist(d_combo_pers$P_NEO_NEURO, na.rm = TRUE)
+
+median(d_combo_pers$P_NEO_NEURO, na.rm = TRUE)
+d_combo_pers$P_NEO_NEURO_split <- ifelse(d_combo_pers$P_NEO_NEURO < 1.96, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_NEO_NEURO_split)
+
+ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_NEO_NEURO_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name="Neuroticism") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+
+#### conscientiousness
+
+hist(d_combo_pers$P_FFI_CONSCI, na.rm = TRUE)
+
+median(d_combo_pers$P_FFI_CONSCI, na.rm = TRUE)
+d_combo_pers$P_FFI_CONSCI_split <- ifelse(d_combo_pers$P_FFI_CONSCI < 2.83, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_FFI_CONSCI_split)
+
+ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_FFI_CONSCI_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name="Conscientiousness") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+
+
+```
+#### P_PID_ANTAG_DOMAIN
+
+```{r}
+## P_PID_ANTAG_DOMAIN
+d_combo_pers$P_PID_ANTAG_DOMAIN_c_scale <- d_combo_pers$P_PID_ANTAG_DOMAIN_c/2
+d_combo_pers$block_trial_number_c_scale <- d_combo_pers$block_trial_number_c/2
+
+m_P_PID_ANTAG_DOMAIN <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c_scale*P_PID_ANTAG_DOMAIN_c_scale + (1|subject),data=d_combo_pers, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_P_PID_ANTAG_DOMAIN)
+
+sjPlot::plot_model(m_P_PID_ANTAG_DOMAIN, type = "pred", terms = c("block_trial_number_c_scale", "P_PID_ANTAG_DOMAIN_c_scale", "structure_condition_c"))
+
+##
+hist(d_combo_pers$P_PID_ANTAG_DOMAIN, na.rm = TRUE)
+
+median(d_combo_pers$P_PID_ANTAG_DOMAIN, na.rm = TRUE)
+d_combo_pers$P_PID_ANTAG_DOMAIN_split <- ifelse(d_combo_pers$P_PID_ANTAG_DOMAIN < 2, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_PID_ANTAG_DOMAIN_split)
+
+antag_graph <- ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_PID_ANTAG_DOMAIN_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option", title = "Antagonism (PID)")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name=" ") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+```
+#### composite fig
+```{r}
+ggpubr::ggarrange(srp_graph, agree_graph, antag_graph,
+          ncol = 2, nrow = 2, common.legend = TRUE, font.label = list(size = 14))
+```
+
+
+#### P_TRIPM_MEAN
+
+```{r}
+## P_TRIPM_MEAN
+m_P_TRIPM_MEAN <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number_c*P_TRIPM_MEAN_c + (1|subject),data=d_combo_psych, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_P_TRIPM_MEAN)
+
+sjPlot::plot_model(m_P_TRIPM_MEAN, type = "pred", terms = c("block_trial_number_c", "P_TRIPM_MEAN_c", "structure_condition_c"))
+
+##
+hist(d_combo_pers$P_PID_ANTAG_DOMAIN, na.rm = TRUE)
+
+median(d_combo_pers$P_PID_ANTAG_DOMAIN, na.rm = TRUE)
+d_combo_pers$P_PID_ANTAG_DOMAIN_split <- ifelse(d_combo_pers$P_PID_ANTAG_DOMAIN < 2, "low", "high")
+
+d_combo_pers_graph <- d_combo_pers %>%
+  drop_na(P_PID_ANTAG_DOMAIN_split)
+
+ggplot(d_combo_pers_graph,aes(block_trial_number,max_reward_choice,color = structure_condition, linetype = P_PID_ANTAG_DOMAIN_split))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  scale_linetype_manual(values=c("solid", "dashed"), labels=c("High","Low"),name="Antagonism \n(PID)") +
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+```
+
+
