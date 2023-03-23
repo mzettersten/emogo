@@ -19,6 +19,8 @@ library(lme4)
 library(ggstance)
 library(cowplot)
 library(AICcmodavg)
+#devtools::install_github("lionel-/ggstance")
+library(ggstance)
 ```
 
 # Data Processing
@@ -356,6 +358,52 @@ ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoHAP
   xlab("Trial Number")+
   ylab("chose best option")
 ```
+
+## UPDATED GRAPHS
+
+```{r}
+
+d_graph_emotion_trialwise_summary <- d_graph_emotion %>%
+  group_by(structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = structure_condition))+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_graph_emotion_trialwise_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_errorbar(data=d_graph_emotion_trialwise_summary,aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+
+# m <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number + (1+block_trial_number|subject)+(1|choiceImage),data=d_graph_emotion, family=binomial)
+# summary(m)
+# 
+# pX <- expand.grid(block_trial_number=seq(1,48,by=1),structure_condition_c=c(-0.5,0.5))
+# predictions <- predictSE(m,pX,re.form=NA, type="response")
+# pX$fit <- predictions$fit
+# pX$se.fit <- predictions$se.fit
+# 
+# ggplot(d_graph_emotion,aes(test_trial_number,as.factor(max_reward_choice),color = as.character(structure_condition)))+
+#   geom_point(size = 0.5, shape=19,alpha=0.05,position = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
+#       geom_violinh(data=subset(d_graph_emotion, structure_condition=="emotion"),aes(fill=as.character(structure_condition)),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.25,alpha=0.4, color=NA)+
+#       geom_violinh(data=subset(d_graph_emotion, structure_condition=="model"),aes(fill=as.character(structure_condition)),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.25,alpha=0.4, color=NA)+
+#   geom_smooth(data=pX,aes(x=block_trial_number,y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1,fill=as.character(structure_condition_c),color=as.character(structure_condition_c)),stat="identity")+
+#   scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
+#   theme_cowplot()+
+#   theme(legend.position="none")+
+#   xlab("Trial Number")+
+#   ylab("chose best option")#+
+#   #geom_smooth(method = "loess")+
+```
+
+
 ## MODEL
 ```{r}
 d_graph <- d %>%

@@ -27,16 +27,16 @@ library(AICcmodavg)
 ## Read in data
 
 ```{r}
-d_v1 <- read_csv("emogo-v1-alldata-anonymized.csv") %>%
+d_v1 <- read_csv(here("data-analysis", "data","v1","processed","emogo-v1-alldata-anonymized.csv")) %>%
   mutate(task_version = "v1")
 
-d_v2 <- read_csv("emogo-v2-alldata.csv") %>%
+d_v2 <- read_csv(here("data-analysis", "data","v2","processed","emogo-v2-alldata.csv")) %>%
   mutate(task_version = "v2")
 
-d_pers <- read_csv("emogo-spark-personality-alldata-anonymized.csv") %>%
+d_pers <- read_csv(here("data-analysis", "data","spark-personality","processed","emogo-spark-personality-alldata-anonymized.csv")) %>%
   mutate(task_version = "spark-personality")
 
-d_psych <- read_csv("emogo-spark-psychopathology-alldata-anonymized.csv") %>%
+d_psych <- read_csv(here("data-analysis", "data","spark-psychopathology","processed","emogo-spark-psychopathology-alldata-anonymized.csv")) %>%
   mutate(task_version = "spark-psychopathology")
 
 d <- d_v1 %>%
@@ -291,6 +291,7 @@ d %>%
 
 ## Emotion
 ```{r}
+
 d_graph <- d %>%
   filter(test_trial_number < 49)%>%
   mutate(choiceValence = ifelse(choiceEmotion == "CC" | choiceEmotion == "HE" | choiceEmotion == "HO" | choiceEmotion == "SUR", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad")) %>%
@@ -327,42 +328,84 @@ table(d_graph_emotion$rewEmotion_inclModel)
 
 color1 <- "#2B959A"
 color2 <-"#D6692A"
+  
+
+d_graph_emotion_trialwise_summary <- d_graph_emotion %>%
+  group_by(structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
 
 ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = structure_condition))+
-  geom_jitter(height = .005, alpha = .05)+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_graph_emotion_trialwise_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_errorbar(data=d_graph_emotion_trialwise_summary,aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
   geom_smooth(method = "loess")+
   theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
   scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
   theme(panel.border = element_blank(),
   panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
-  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))+
+  theme(legend.position=c(0.8,0.2))
 
+
+# ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
+#   geom_jitter(height = .005, alpha = .05)+
+#   geom_smooth(method = "loess")+
+#   geom_smooth(method = "loess")+
+#   theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+#   #scale_color_manual(name="Structure Condition")+
+#   theme(panel.border = element_blank(),
+#   panel.grid.major = element_blank(),
+#   panel.grid.minor = element_blank(),
+#   axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+
+#summarize by emotion
+d_graph_emotion_trialwise_by_emotion_summary <- d_graph_emotion %>%
+  group_by(rewEmotion_inclModel,structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
 
 ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
-  geom_jitter(height = .005, alpha = .05)+
-  geom_smooth(method = "loess")+
-  geom_smooth(method = "loess")+
-  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
-  #scale_color_manual(name="Structure Condition")+
-  theme(panel.border = element_blank(),
-  panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank(),
-  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
-
-ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
-  geom_jitter(height = .005, alpha = .05)+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_graph_emotion_trialwise_by_emotion_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  #geom_errorbar(data=d_graph_emotion_trialwise_by_emotion_summary,aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
   geom_smooth(method = "loess")+
   xlab("Trial Number")+
-  ylab("chose best option")+
-  facet_grid(~ rewEmotion_inclModel) +
-  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  ylab("Chose Best Option")+
+  facet_grid(~ rewEmotion_inclModel)+
+  theme_bw()+
   #scale_color_manual(name="Structure Condition")+
   theme(panel.border = element_blank(),
   panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
   legend.position = "none",
-  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+  axis.line = element_line(colour = "black"), 
+  legend.key.size = unit(1, "cm")#,
+  #text=element_text(size=16, family="Times")
+  )+
+  ylim(0,1)
+
+#summarize by valence
+d_graph_emotion_trialwise_by_emotion_summary <- d_graph_emotion %>%
+  group_by(rewEmotion_inclModel,structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
   
 ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoValence))+
   geom_jitter(height = .005, alpha = .05)+
@@ -371,15 +414,31 @@ ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoVal
   xlab("Trial Number")+
   ylab("chose best option") 
 
+#summarize by emotion/happy
+d_graph_emotion_trialwise_by_happy_summary <- d_graph_emotion %>%
+  group_by(rewEmoHAPPY_EX,structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
+
 ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoHAPPY_EX))+
-  geom_jitter(height = .005, alpha = .05)+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_graph_emotion_trialwise_by_happy_summary,aes(y=mean_choice),position=position_dodge(width=.9),alpha=0.5)+
+  #geom_errorbar(data=d_graph_emotion_trialwise_by_happy_summary,aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
   geom_smooth(method = "loess")+
   theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
   scale_color_manual(values=c("darkgreen", "blue", "darkred"), labels=c("Happy & Exhuberent","Model", "All Other Emotions"),name=" ")+
   theme(panel.border = element_blank(),
   panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
-  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),
+  #text=element_text(size=20, family="Times")
+  )+
+  theme(legend.position=c(0.8,0.2))
 ```
 
 ```{r}
