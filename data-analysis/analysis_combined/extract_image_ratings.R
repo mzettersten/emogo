@@ -1,6 +1,9 @@
 library(here)
 library(tidyverse)
 library(jsonlite)
+library(tidyr)
+library(gghalves)
+library(cowplot)
 
 d_v1 <- read_csv(here("data-analysis", "data","v1","processed","emogo-v1-alldata-anonymized.csv")) %>%
   mutate(task_version = "v1")
@@ -49,3 +52,70 @@ write_csv(image_norms_d,here("data-analysis", "data","combined","emogo-combined-
 temp <- image_norms_d %>%
   group_by(emotion,response_cleaned) %>%
   summarize(n=n())
+
+by_participant_emotion_cat_response_count <- image_norms_d %>%
+  group_by(subject,emotion) %>%
+  count(response_cleaned)
+
+by_participant_emotion_cat_responses_avg_rating <- image_norms_d %>%
+  group_by(subject,emotion) %>%
+  summarize(
+    total_n=n(),
+    avg_rating=mean(as.numeric(rating),na.rm=TRUE))
+
+by_participant_emotion_cat_responses <- image_norms_d %>%
+  group_by(subject,emotion) %>%
+  count(response_cleaned) %>%
+  left_join(by_participant_emotion_cat_responses_avg_rating) %>%
+  mutate(
+    percent_response=n/total_n
+  ) %>%
+  arrange(subject,emotion,desc(percent_response)) %>%
+  mutate(
+    counter=seq_along(response_cleaned),
+    response_name=paste0("response_",counter)
+  ) %>%
+  select(-n,-counter) %>%
+  pivot_wider(names_from=response_name,values_from = c(percent_response,response_cleaned)) %>%
+  mutate(
+    response_diff=percent_response_response_1-percent_response_response_2,
+    max_agreement=percent_response_response_1
+  ) 
+
+ggplot(by_participant_emotion_cat_responses,aes(reorder(emotion,-avg_rating,mean),avg_rating))+
+  geom_half_boxplot(side="r",nudge=0.2)+
+  geom_half_violin(side="l",nudge=0.2)+
+  geom_jitter(width=0.05)+
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5))+
+  theme_cowplot()+
+  theme(legend.position="none")+
+  xlab("Emotion")+
+  ylab("Rating")
+
+ggplot(by_participant_emotion_cat_responses,aes(reorder(emotion,-max_agreement,mean),max_agreement))+
+  geom_half_boxplot(side="r",nudge=0.2)+
+  geom_half_violin(side="l",nudge=0.2)+
+  geom_jitter(width=0.05,alpha=0.1)+
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5))+
+  theme_cowplot()+
+  theme(legend.position="none")+
+  xlab("Emotion")
+
+summarize_participant_emotion_cat_agreement <- by_participant_emotion_cat_responses %>%
+  group_by(emotion) %>%
+  summarize(
+    N=n(),
+    mean_max_agreement=mean(max_agreement),
+    sd_agreement=sd(max_agreement),
+    se_agreement=sd_agreement/sqrt(N),
+    ci=qt(0.975, N-1)*sd_agreement/sqrt(N),
+  )
+
+ggplot(summarize_participant_emotion_cat_agreement,aes(reorder(emotion,-mean_max_agreement,mean),mean_max_agreement,fill=emotion))+
+  geom_bar(stat="identity",color="black")+
+  geom_jitter(data=by_participant_emotion_cat_responses,aes(reorder(emotion,-max_agreement,mean),y=max_agreement),width=0.05,alpha=0.05,color="black")+
+  geom_errorbar(aes(ymin=mean_max_agreement-ci,ymax=mean_max_agreement+ci),width=0.3,linewidth=1.2)+
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5))+
+  theme_cowplot()+
+  theme(legend.position="none")+
+  xlab("Emotion")
