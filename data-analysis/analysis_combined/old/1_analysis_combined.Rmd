@@ -1,0 +1,464 @@
+---
+title: "Emogo Combined Analysis"
+author: "Martin Zettersten"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(viridisLite)
+library(lme4)
+library(ggstance)
+library(cowplot)
+library(AICcmodavg)
+#devtools::install_github("lionel-/ggstance")
+library(ggstance)
+```
+
+# Data Processing
+
+## Read in data
+
+```{r}
+d_v1 <- read_csv(here("data-analysis", "data","v1","processed","emogo-v1-alldata-anonymized.csv")) %>%
+  mutate(task_version = "v1")
+
+d_v2 <- read_csv(here("data-analysis", "data","v2","processed","emogo-v2-alldata.csv")) %>%
+  mutate(task_version = "v2")
+
+d_pers <- read_csv(here("data-analysis", "data","spark-personality","processed","emogo-spark-personality-alldata-anonymized.csv")) %>%
+  mutate(task_version = "spark-personality")
+
+d_psych <- read_csv(here("data-analysis", "data","spark-psychopathology","processed","emogo-spark-psychopathology-alldata-anonymized.csv")) %>%
+  mutate(task_version = "spark-psychopathology")
+
+d <- d_v1 %>%
+  full_join(d_v2) %>%
+  full_join(d_pers) %>%
+  full_join(d_psych)
+
+
+d <- d %>%
+  filter(
+    !(trial_type %in% c("show-reward"))
+  )
+
+length(unique(d$subject))
+```
+
+## Adding some useful columns
+
+Adding columns to characterize participant choices.
+
+```{r}
+d <- d %>%
+  mutate(
+    trial_number = case_when(
+      trial_index<8 ~ trial_index,
+      trial_index<199 ~ 7+(trial_index-7)/2,
+      TRUE ~ trial_index-96
+    )
+  ) %>%
+  relocate(trial_number,.after=trial_index) %>%
+  mutate(
+    test_trial_number = case_when(
+      trial_number<7 ~ NA_real_,
+      trial_number<103 ~ trial_number-6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  relocate(test_trial_number,.after=trial_number) %>%
+  mutate(
+    block_trial_number = case_when(
+      test_trial_number < 49 ~ test_trial_number,
+      TRUE ~ test_trial_number - 48),
+    block_trial_number_c = block_trial_number - 24.5
+  ) %>%
+  relocate(block_trial_number,.after=test_trial_number) %>%
+  relocate(block_trial_number_c,.after=block_trial_number) %>%
+  mutate(
+    explore_block = case_when(
+      test_trial_number<9 ~ 1,
+      test_trial_number<17 ~ 2,
+      test_trial_number<25 ~ 3,
+      test_trial_number<33 ~ 4,
+      test_trial_number < 41 ~ 5,
+      test_trial_number < 49 ~ 6,
+      test_trial_number < 57 ~ 7,
+      test_trial_number<65 ~ 8,
+      test_trial_number<73 ~ 9,
+      test_trial_number<81 ~ 10,
+      test_trial_number <89 ~ 11,
+      test_trial_number <97 ~ 12,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    max_reward_choice = case_when(
+      reward_score_unadjusted ==8 ~ 1,
+      !is.na(test_trial_number) ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    cur_structure_condition=case_when(
+      test_trial_number < 49 ~ structure_condition,
+      !is.na(test_trial_number) & match_condition == "match" ~ structure_condition,
+       test_trial_number >= 49 & structure_condition == "emotion" ~ "model",
+      test_trial_number >= 49 & structure_condition == "model" ~ "emotion"
+    )
+  ) %>%
+  mutate(block = case_when(
+      test_trial_number < 49 ~ 1,
+      test_trial_number >= 49 ~ 2,
+      TRUE ~ NA_real_
+    ))
+
+#recenter vars
+d <- d %>%
+  mutate(
+    structure_condition_c = case_when(
+      structure_condition == "model" ~ -0.5,
+      structure_condition == "emotion" ~ 0.5),
+    cur_structure_condition_c = case_when(
+      cur_structure_condition == "model" ~ -0.5,
+      cur_structure_condition == "emotion" ~ 0.5),
+    match_condition_c = case_when(
+      match_condition == "match" ~ 0.5,
+      match_condition == "mismatch" ~ -0.5
+    ),
+    cur_structure_condition_model = case_when(
+      cur_structure_condition == "model" ~ 0,
+      cur_structure_condition == "emotion" ~ 1),
+    cur_structure_condition_emotion = case_when(
+      cur_structure_condition == "model" ~ -1,
+      cur_structure_condition == "emotion" ~ 0),
+    match_condition_match = case_when(
+      match_condition == "match" ~ 0,
+      match_condition == "mismatch" ~ -1
+    ),
+    match_condition_mismatch = case_when(
+      match_condition == "match" ~ 1,
+      match_condition == "mismatch" ~ 0
+    ),
+    block_c = case_when(
+      test_trial_number < 49 ~ -0.5,
+      TRUE ~ 0.5
+    ),
+    block_learn = case_when(
+      block==1 ~ 0,
+      block==2 ~ 1
+    ),
+    block_gen = case_when(
+      block==1 ~ -1,
+      block==2 ~ 0
+    )
+  )
+```
+
+## Check data {.tabset}
+
+
+### Open ended responses
+
+```{r}
+open_resps <- d %>%
+  filter(grepl("patterns",response)) %>%
+  select(subject, structure_condition, match_condition ,response) %>% 
+  extract(response, into = c("patterns", "strategy", "comments"),
+          regex = "patterns\":\"(.*)\",\"strategy\":\"(.*)\",\"comments\":\"(.*)")
+
+#write_csv(open_resps, "emogo_combined_open_resps.csv")
+```
+
+
+### Attention check
+
+```{r}
+attention_check <- d %>%
+  filter(trial_index %in% c(4,5)) %>%
+  mutate(
+    attention_check_correct_choice = case_when(
+      trial_index == 4 ~ "stimuli/horse.jpg",
+      trial_index == 5 ~ "stimuli/hammer.jpg"
+    ),
+    check_correct = ifelse(attention_check_correct_choice==choiceImage,1,0)
+  ) %>%
+  group_by(subject) %>%
+  summarize(
+    N=n(),
+    avg_correct = mean(check_correct)
+  )
+
+passed_attention_check <- attention_check %>%
+  filter(avg_correct ==1) %>%
+  pull(subject)
+```
+
+### Total time
+
+```{r}
+total_time <- d %>%
+  filter(trial_index==206) %>%
+  select(subject,time_elapsed) %>%
+  distinct() %>%
+  mutate(time_mins = time_elapsed/1000/60)
+
+#Minumum time
+min(total_time$time_mins)
+
+#Any subjects with times under 4 minutes?
+subjects_too_fast <- total_time %>%
+  filter(time_mins<4)
+
+subjects_too_fast %>%
+  pull(subject)
+```
+
+### Check image location selection
+
+```{r}
+percent_location_selections <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(subject,choiceLocation) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+#any frequencies above 80%?
+subjects_same_location_exclusion <- percent_location_selections %>%
+  filter(freq>0.8) 
+
+subjects_same_location_exclusion %>%
+  distinct(subject) %>%
+  pull(subject)
+```
+
+### Reward ranks
+
+```{r}
+reward_rank <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(test_trial_number==96) %>%
+  select(subject,structure_condition,match_condition,score_after_trial)
+
+median_score <- median(reward_rank$score_after_trial)
+
+ggplot(reward_rank,aes(x=score_after_trial))+
+  geom_histogram()+
+  geom_vline(xintercept = median_score)
+
+ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
+  geom_density()+
+  facet_wrap(~structure_condition)
+
+subjects_top_50 <- reward_rank %>%
+  filter(score_after_trial>=median_score) %>%
+  select(subject)
+
+#write_csv(subjects_top_50,here("data-analysis","data","v1","processed","subjects_top_50.csv"))
+
+conditions_top_50 <- reward_rank %>%
+  filter(subject %in% subjects_top_50$subject) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+conditions_top_50
+```
+
+### Final tally
+
+```{r}
+#exclude any participants who meet exclusion criteria
+d <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(!(subject %in% subjects_same_location_exclusion)) %>%
+  filter(!(subject %in% subjects_too_fast))
+
+d %>%
+  distinct(subject,structure_condition,match_condition) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+```
+# HERE
+
+## EMOTION
+```{r}
+d_graph <- d %>%
+  filter(test_trial_number < 49)%>%
+  mutate(choiceValence = ifelse(choiceEmotion == "CC" | choiceEmotion == "HE" | choiceEmotion == "HO" | choiceEmotion == "SUR", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad")) %>%
+  mutate(choiceGender = ifelse(grepl('M',choiceModel), "male", "female")) %>%
+  mutate(choiceRace = ifelse(grepl('A',choiceModel),"Asian",
+                             ifelse(grepl('B',choiceModel),"Black",
+                                    ifelse(grepl('H',choiceModel),"Hispanic", "White"))))
+
+
+d_get_reward_emo <- d_graph %>%
+  filter(structure_condition == "emotion") %>%
+  filter(reward_score_unadjusted == 8) %>%
+  mutate(rewEmotion = choiceEmotion) %>%
+  distinct(subject, task_version, rewEmotion)
+
+
+d_graph_emotion <- d_graph %>%
+  full_join(d_get_reward_emo) %>%
+  mutate(rewEmotion = ifelse(grepl('AO',rewEmotion),"angry",
+                           ifelse(grepl('CC',rewEmotion),"calm",
+                           ifelse(grepl('DO',rewEmotion),"disgust",
+                           ifelse(grepl('FO',rewEmotion),"fear",
+                           ifelse(grepl('HE',rewEmotion),"exuberent",
+                           ifelse(grepl('HO',rewEmotion),"happy",
+                           ifelse(grepl('SC',rewEmotion),"sad","surprise")))))))) %>%
+  mutate(rewEmotion_inclModel = ifelse(d_graph$structure_condition == "model", "model", rewEmotion)) %>%
+ drop_na(rewEmotion_inclModel) %>%
+  mutate(rewEmoValence = ifelse(rewEmotion_inclModel == "model", "model",
+         ifelse(rewEmotion == "calm" | rewEmotion == "exuberent" | rewEmotion == "happy" | rewEmotion == "surprise", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad)"))) %>%
+  mutate(rewEmoHAPPY_EX = ifelse(rewEmotion_inclModel == "model", "model",
+                                 ifelse(rewEmotion == "exuberent" | rewEmotion == "happy" , "happy emotions (happy, exuberent)", "not happy emotions")) )
+
+length(unique(d_graph_emotion$subject))
+table(d_graph_emotion$rewEmotion_inclModel)
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = structure_condition))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmotion_inclModel))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")+
+  facet_grid(~ rewEmotion_inclModel) +
+  theme(legend.position = "none")
+  
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoValence))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  scale_color_manual(values = c("blue", "darkred", "darkgreen"))+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = rewEmoHAPPY_EX))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  scale_color_manual(values = c("darkgreen", "blue", "darkred"))+
+  xlab("Trial Number")+
+  ylab("chose best option")
+```
+
+## UPDATED GRAPHS
+
+```{r}
+
+d_graph_emotion_trialwise_summary <- d_graph_emotion %>%
+  group_by(structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
+
+ggplot(d_graph_emotion,aes(test_trial_number,max_reward_choice,color = structure_condition))+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_graph_emotion_trialwise_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_errorbar(data=d_graph_emotion_trialwise_summary,aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+
+# m <- glmer(max_reward_choice ~ structure_condition_c*block_trial_number + (1+block_trial_number|subject)+(1|choiceImage),data=d_graph_emotion, family=binomial)
+# summary(m)
+# 
+# pX <- expand.grid(block_trial_number=seq(1,48,by=1),structure_condition_c=c(-0.5,0.5))
+# predictions <- predictSE(m,pX,re.form=NA, type="response")
+# pX$fit <- predictions$fit
+# pX$se.fit <- predictions$se.fit
+# 
+# ggplot(d_graph_emotion,aes(test_trial_number,as.factor(max_reward_choice),color = as.character(structure_condition)))+
+#   geom_point(size = 0.5, shape=19,alpha=0.05,position = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
+#       geom_violinh(data=subset(d_graph_emotion, structure_condition=="emotion"),aes(fill=as.character(structure_condition)),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.25,alpha=0.4, color=NA)+
+#       geom_violinh(data=subset(d_graph_emotion, structure_condition=="model"),aes(fill=as.character(structure_condition)),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.25,alpha=0.4, color=NA)+
+#   geom_smooth(data=pX,aes(x=block_trial_number,y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1,fill=as.character(structure_condition_c),color=as.character(structure_condition_c)),stat="identity")+
+#   scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
+#   theme_cowplot()+
+#   theme(legend.position="none")+
+#   xlab("Trial Number")+
+#   ylab("chose best option")#+
+#   #geom_smooth(method = "loess")+
+```
+
+
+## MODEL
+```{r}
+d_graph <- d %>%
+  filter(test_trial_number < 49)%>%
+  mutate(choiceValence = ifelse(choiceEmotion == "CC" | choiceEmotion == "HE" | choiceEmotion == "HO" | choiceEmotion == "SUR", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad")) %>%
+  mutate(choiceGender = ifelse(grepl('M',choiceModel), "male", "female")) %>%
+  mutate(choiceRace = ifelse(grepl('A',choiceModel),"Asian",
+                             ifelse(grepl('B',choiceModel),"Black",
+                                    ifelse(grepl('H',choiceModel),"Hispanic", "White"))))
+
+
+d_get_reward_model <- d_graph %>%
+  filter(structure_condition == "model") %>%
+  filter(reward_score_unadjusted == 8) %>%
+  mutate(rewModel = choiceModel) %>%
+  distinct(subject, task_version, rewModel)
+
+d_graph_model <- d_graph %>%
+  full_join(d_get_reward_model) %>%
+  mutate(rewModel_inclEmo = ifelse(d_graph$structure_condition == "emotion", "emotion", rewModel)) %>%
+ drop_na(rewModel_inclEmo)  %>%
+  mutate(rewGender = ifelse(rewModel_inclEmo == "emotion", "emotion",
+                            ifelse(grepl('M',rewModel), "male", "female"))) %>%
+  mutate(rewRace = ifelse(rewModel_inclEmo == "emotion", "emotion",
+                          ifelse(grepl('A',choiceModel),"Asian",
+                             ifelse(grepl('B',choiceModel),"Black",
+                                    ifelse(grepl('H',choiceModel),"Hispanic", "White")))))
+
+length(unique(d_graph_model$subject))
+table(d_graph_model$rewModel_inclEmo)
+
+ggplot(d_graph_model,aes(test_trial_number,max_reward_choice,color = rewModel_inclEmo))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+ggplot(d_graph_model,aes(test_trial_number,max_reward_choice,color = rewGender))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+ggplot(d_graph_model,aes(test_trial_number,max_reward_choice,color = rewRace))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+ggplot(d_graph_model,aes(test_trial_number,max_reward_choice,color = rewRace, linetype = rewGender))+
+  geom_jitter(height = .005, alpha = .05)+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("chose best option")
+
+
+```

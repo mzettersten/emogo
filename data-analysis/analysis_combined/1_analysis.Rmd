@@ -1,0 +1,643 @@
+---
+title: "Emogo Combined Analysis"
+author: "Rista Plate via Martin Zettersten"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+
+```{r setup, include=FALSE}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(viridisLite)
+library(lme4)
+library(ggstance)
+library(cowplot)
+library(AICcmodavg)
+library(jsonlite)
+
+
+figure_path <- here("data-analysis","analysis_combined","figures")
+```
+
+# Data Processing
+
+## Read in data
+
+```{r}
+d_v1 <- read_csv(here("data-analysis", "data","v1","processed","emogo-v1-alldata-anonymized.csv")) %>%
+  mutate(task_version = "v1")
+
+d_v2 <- read_csv(here("data-analysis", "data","v2","processed","emogo-v2-alldata.csv")) %>%
+  mutate(task_version = "v2")
+
+d_pers <- read_csv(here("data-analysis", "data","spark-personality","processed","emogo-spark-personality-alldata-anonymized.csv")) %>%
+  mutate(task_version = "spark-personality")
+
+d_psych <- read_csv(here("data-analysis", "data","spark-psychopathology","processed","emogo-spark-psychopathology-alldata-anonymized.csv")) %>%
+  mutate(task_version = "spark-psychopathology")
+
+d <- d_v1 %>%
+  full_join(d_v2) %>%
+  full_join(d_pers) %>%
+  full_join(d_psych)
+
+
+d <- d %>%
+  filter(
+    !(trial_type %in% c("show-reward"))
+  )
+
+length(unique(d$subject))
+```
+
+## Adding some useful columns
+
+Adding columns to characterize participant choices.
+
+```{r}
+d <- d %>%
+  mutate(
+    trial_number = case_when(
+      trial_index<8 ~ trial_index,
+      trial_index<199 ~ 7+(trial_index-7)/2,
+      TRUE ~ trial_index-96
+    )
+  ) %>%
+  relocate(trial_number,.after=trial_index) %>%
+  mutate(
+    test_trial_number = case_when(
+      trial_number<7 ~ NA_real_,
+      trial_number<103 ~ trial_number-6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  relocate(test_trial_number,.after=trial_number) %>%
+  mutate(
+    block_trial_number = case_when(
+      test_trial_number < 49 ~ test_trial_number,
+      TRUE ~ test_trial_number - 48),
+    block_trial_number_c = block_trial_number - 24.5
+  ) %>%
+  relocate(block_trial_number,.after=test_trial_number) %>%
+  relocate(block_trial_number_c,.after=block_trial_number) %>%
+  mutate(
+    explore_block = case_when(
+      test_trial_number<9 ~ 1,
+      test_trial_number<17 ~ 2,
+      test_trial_number<25 ~ 3,
+      test_trial_number<33 ~ 4,
+      test_trial_number < 41 ~ 5,
+      test_trial_number < 49 ~ 6,
+      test_trial_number < 57 ~ 7,
+      test_trial_number<65 ~ 8,
+      test_trial_number<73 ~ 9,
+      test_trial_number<81 ~ 10,
+      test_trial_number <89 ~ 11,
+      test_trial_number <97 ~ 12,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    max_reward_choice = case_when(
+      reward_score_unadjusted ==8 ~ 1,
+      !is.na(test_trial_number) ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    cur_structure_condition=case_when(
+      test_trial_number < 49 ~ structure_condition,
+      !is.na(test_trial_number) & match_condition == "match" ~ structure_condition,
+       test_trial_number >= 49 & structure_condition == "emotion" ~ "model",
+      test_trial_number >= 49 & structure_condition == "model" ~ "emotion"
+    )
+  ) %>%
+  mutate(block = case_when(
+      test_trial_number < 49 ~ 1,
+      test_trial_number >= 49 ~ 2,
+      TRUE ~ NA_real_
+    ))
+
+#recenter vars
+d <- d %>%
+  mutate(
+    structure_condition_c = case_when(
+      structure_condition == "model" ~ -0.5,
+      structure_condition == "emotion" ~ 0.5),
+    cur_structure_condition_c = case_when(
+      cur_structure_condition == "model" ~ -0.5,
+      cur_structure_condition == "emotion" ~ 0.5),
+    match_condition_c = case_when(
+      match_condition == "match" ~ 0.5,
+      match_condition == "mismatch" ~ -0.5
+    ),
+    cur_structure_condition_model = case_when(
+      cur_structure_condition == "model" ~ 0,
+      cur_structure_condition == "emotion" ~ 1),
+    cur_structure_condition_emotion = case_when(
+      cur_structure_condition == "model" ~ -1,
+      cur_structure_condition == "emotion" ~ 0),
+    match_condition_match = case_when(
+      match_condition == "match" ~ 0,
+      match_condition == "mismatch" ~ -1
+    ),
+    match_condition_mismatch = case_when(
+      match_condition == "match" ~ 1,
+      match_condition == "mismatch" ~ 0
+    ),
+    block_c = case_when(
+      test_trial_number < 49 ~ -0.5,
+      TRUE ~ 0.5
+    ),
+    block_learn = case_when(
+      block==1 ~ 0,
+      block==2 ~ 1
+    ),
+    block_gen = case_when(
+      block==1 ~ -1,
+      block==2 ~ 0
+    )
+  )
+```
+
+## Check data {.tabset}
+
+
+### Open ended responses
+
+```{r}
+open_resps <- d %>%
+  filter(grepl("patterns",response)) %>%
+  select(subject, structure_condition, match_condition ,response) %>% 
+  extract(response, into = c("patterns", "strategy", "comments"),
+          regex = "patterns\":\"(.*)\",\"strategy\":\"(.*)\",\"comments\":\"(.*)")
+
+#write_csv(open_resps, "emogo_combined_open_resps.csv")
+```
+
+
+### Attention check
+
+```{r}
+attention_check <- d %>%
+  filter(trial_index %in% c(4,5)) %>%
+  mutate(
+    attention_check_correct_choice = case_when(
+      trial_index == 4 ~ "stimuli/horse.jpg",
+      trial_index == 5 ~ "stimuli/hammer.jpg"
+    ),
+    check_correct = ifelse(attention_check_correct_choice==choiceImage,1,0)
+  ) %>%
+  group_by(subject) %>%
+  summarize(
+    N=n(),
+    avg_correct = mean(check_correct)
+  )
+
+passed_attention_check <- attention_check %>%
+  filter(avg_correct ==1) %>%
+  pull(subject)
+```
+
+### Total time
+
+```{r}
+total_time <- d %>%
+  filter(trial_index==206) %>%
+  select(subject,time_elapsed) %>%
+  distinct() %>%
+  mutate(time_mins = time_elapsed/1000/60)
+
+#Minumum time
+min(total_time$time_mins)
+
+#Any subjects with times under 4 minutes?
+subjects_too_fast <- total_time %>%
+  filter(time_mins<4)
+
+subjects_too_fast %>%
+  pull(subject)
+```
+
+### Check image location selection
+
+```{r}
+percent_location_selections <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(subject,choiceLocation) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+#any frequencies above 80%?
+subjects_same_location_exclusion <- percent_location_selections %>%
+  filter(freq>0.8) 
+
+subjects_same_location_exclusion %>%
+  distinct(subject) %>%
+  pull(subject)
+```
+
+### Final tally
+
+```{r}
+#exclude any participants who meet exclusion criteria
+d <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(!(subject %in% subjects_same_location_exclusion)) %>%
+  filter(!(subject %in% subjects_too_fast))
+
+d %>%
+  distinct(subject,structure_condition,match_condition) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+```
+
+
+## Learning Phase
+
+### Model
+
+```{r, cache=TRUE, eval=TRUE}
+m_learn <- glmer(max_reward_choice ~ cur_structure_condition_c*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m)
+confint(m_learn, method="Wald")
+```
+
+### Summarize
+
+```{r}
+subj_summary <- d %>%
+  filter(!is.na(block)) %>%
+  group_by(subject,block,cur_structure_condition,match_condition) %>%
+  summarize(
+    mean_reward_max=mean(max_reward_choice)
+  )
+
+learning_summary <- subj_summary %>%
+  filter(block==1) %>%
+  group_by(cur_structure_condition) %>%
+  summarize(
+    N=n(),
+    avg=mean(mean_reward_max),
+    ci=qt(0.975, N-1)*sd(mean_reward_max,na.rm=T)/sqrt(N),
+    lower_ci=avg-ci,
+    upper_ci=avg+ci,
+  )
+```
+
+### Plot
+
+```{r}
+#create predicted data
+pX <- expand.grid(
+  cur_structure_condition_c=c(-0.5,0.5),
+  block_trial_number_c=seq(-23.5,23.5,by=1))
+predictions <- predictSE(m_learn,pX,re.form=NA, type="response")
+pX$fit <- predictions$fit
+pX$se.fit <- predictions$se.fit
+
+pX <- pX %>%
+  mutate(
+    block_trial_number = block_trial_number_c+24.5,
+    cur_structure_condition = case_when(
+      cur_structure_condition_c==0.5 ~ "emotion",
+      cur_structure_condition_c==-0.5 ~ "model"
+    )
+  )
+
+p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.factor(max_reward_choice),color=cur_structure_condition,fill=cur_structure_condition))+
+      geom_point(size = 0.5, alpha=0.02,shape=19,position  = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==-0.5),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==0.5),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+  geom_hline(yintercept=0.25*4+1,linetype="dashed")+
+      geom_smooth(data=pX,aes(y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1,fill=cur_structure_condition),stat="identity")+
+      theme_classic(base_size=18)+
+      ylab("Probability of \nreward-maximizing choice")+
+      scale_color_brewer(
+        palette="Set1",
+        name="Structure Condition",
+        breaks=c(0.5,-0.5),
+        labels=c("Emotion","Model"))+
+      scale_fill_brewer(
+        palette="Set1",
+        name="Structure Condition",
+        breaks=c(0.5,-0.5),
+        labels=c("Emotion","Model"))+
+      scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
+      xlab("Block Trial Number")
+p
+
+ggsave(here(figure_path,"learning_reward_maximizing.png"),width=9,height=6)
+```
+
+
+```{r}
+reward_list <- d %>%
+  filter(trial_type=="explore-choice") %>%
+  filter(!is.na(block_trial_number)) %>%
+  select(subject,hitId,structure_condition,match_condition,block, block_trial_number,image1,image2,image3,image4,rewards_unadjusted) %>%
+  mutate(reward_list = map(rewards_unadjusted, ~ fromJSON(.) %>% as.data.frame(row.names=paste0("reward",seq(1,4))) %>% 
+                       rownames_to_column(var = "reward_index"))) %>%
+  
+  mutate() %>%
+  unnest() %>%
+  pivot_wider(names_from = "reward_index",values_from = ".")
+
+reward_list <- reward_list %>%
+  mutate(
+    reward_maximizing_image = case_when(
+      reward1 == 8 ~ image1,
+      reward2 == 8 ~ image2,
+      reward3 == 8 ~ image3,
+      reward4 == 8 ~ image4,
+      TRUE ~ NA
+    )
+  ) %>%
+  separate(reward_maximizing_image,into=c("reward_maximizing_model","reward_maximizing_emotion"),sep="_",remove=FALSE) %>%
+  mutate(
+    reward_maximizing_model=str_replace(reward_maximizing_model,"stimuli/",""),
+    reward_maximizing_emotion=str_replace(reward_maximizing_emotion,".jpg",""),
+  )
+
+d <- d %>%
+  left_join(reward_list)
+
+
+d_learning <- d %>%
+  filter(test_trial_number < 49)%>%
+  mutate(choiceValence = ifelse(choiceEmotion == "CC" | choiceEmotion == "HE" | choiceEmotion == "HO" | choiceEmotion == "SUR", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad)")) %>%
+  mutate(choiceGender = ifelse(grepl('M',choiceModel), "male", "female")) %>%
+  mutate(choiceRace = ifelse(grepl('A',choiceModel),"Asian",
+                             ifelse(grepl('B',choiceModel),"Black",
+                                    ifelse(grepl('H',choiceModel),"Hispanic", "White")))) %>%
+  mutate(choiceValence_C = ifelse(choiceValence ==  "positive emotions (calm, happy, exuberent, surprise)", .5, -.5))
+
+d_learning <- d_learning %>%
+  mutate(overall_reward_maximizing_emotion_name = case_when(
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='AO' ~ "angry",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='CC' ~ "calm",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='DO' ~ "disgust",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='FO' ~ "fear",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='HE' ~ "exuberant",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='HO' ~ "happy",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='SC' ~ "sad",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='SUR' ~ "surprise",
+    TRUE ~ NA)) %>%
+  mutate(overall_reward_maximizing_emotion_incl_model = ifelse(d_graph$cur_structure_condition == "model", "model", overall_reward_maximizing_emotion_name)) %>%
+  mutate(rewEmoValence = ifelse(overall_reward_maximizing_emotion_incl_model == "model", "model",
+         ifelse(overall_reward_maximizing_emotion_name == "calm" | overall_reward_maximizing_emotion_name == "exuberant" | overall_reward_maximizing_emotion_name == "happy" | overall_reward_maximizing_emotion_name == "surprise", "positive emotions (calm, happy, exuberant, surprise)", "negative emotions (anger, fear, disgust, sad)"))) %>%
+  mutate(rewEmoHAPPY_EX = ifelse(overall_reward_maximizing_emotion_incl_model == "model", "model",
+                                 ifelse(overall_reward_maximizing_emotion_name == "exuberent" | overall_reward_maximizing_emotion_name == "happy" , "happy emotions (happy, exuberent)", "not happy emotions")) ) %>%
+  mutate(
+    valence_facetting = case_when(
+      overall_reward_maximizing_emotion_name %in% c("calm","exuberant","happy","surprise") ~ "positive",
+      overall_reward_maximizing_emotion_name %in% c("angry","fear","disgust","sad") ~ "negative",
+      cur_structure_condition == "model" ~ "model",
+      TRUE ~ NA
+    )
+  )
+
+length(unique(d_learning$subject))
+table(d_learning$overall_reward_maximizing_emotion_incl_model)
+
+color1 <- "#2B959A"
+color2 <-"#D6692A"
+  
+
+d_learning_trialwise_summary <- d_learning %>%
+  group_by(structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
+
+ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = structure_condition))+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_learning_trialwise_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_errorbar(data=d_learning_trialwise_summary,aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
+  geom_smooth(method = "loess")+
+  theme_bw()+labs(x="Trial Number",y="Chose Best Option")+
+  scale_color_manual(values=c(color1, color2), labels=c("Emotion","Model"),name="Structure Condition")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black"), legend.key.size = unit(1, "cm"),text=element_text(size=20, family="Times"))+
+  theme(legend.position=c(0.8,0.2))
+
+#summarize by emotion
+d_learning_trialwise_by_emotion_summary <- d_learning %>%
+  group_by(overall_reward_maximizing_emotion_incl_model,structure_condition,test_trial_number) %>%
+  summarize(
+    N=n(),
+    mean_choice=mean(max_reward_choice),
+    sd_choice=sd(max_reward_choice),
+    se_choice=sd_choice/sqrt(N),
+    ci=qt(0.975, N-1)*sd_choice/sqrt(N),
+  )
+
+ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward_maximizing_emotion_incl_model))+
+  #geom_jitter(height = .005, alpha = .05)+
+  geom_point(data=d_learning_trialwise_by_emotion_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("Chose Best Option")+
+  facet_grid(~ overall_reward_maximizing_emotion_incl_model)+
+  theme_bw()+
+  #scale_color_manual(name="Structure Condition")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  legend.position = "none",
+  axis.line = element_line(colour = "black"), 
+  legend.key.size = unit(1, "cm")#,
+  #text=element_text(size=16, family="Times")
+  )+
+  ylim(0,1)
+
+ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward_maximizing_emotion_incl_model))+
+  #geom_jitter(height = .005, alpha = .05)+
+  #geom_point(data=d_learning_trialwise_by_emotion_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_smooth(method = "loess")+
+  xlab("Trial Number")+
+  ylab("Chose Best Option")+
+  #facet_grid(~ overall_reward_maximizing_emotion_incl_model)+
+  theme_bw()+
+  #scale_color_manual(name="Structure Condition")+
+  theme(panel.border = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  legend.position = "none",
+  axis.line = element_line(colour = "black"), 
+  legend.key.size = unit(1, "cm")#,
+  #text=element_text(size=16, family="Times")
+  )+
+  ylim(0,1)
+```
+
+
+
+## Generalization
+
+### Full Model
+
+```{r, cache=TRUE, eval=TRUE}
+#### Pruning random effects structure
+#maximal random effects structure
+m <- glmer(max_reward_choice ~ cur_structure_condition_c*match_condition_c*block_c*block_trial_number_c + (1+block_c*block_trial_number_c|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m)
+
+```
+
+### Plot Full Model
+
+
+```{r}
+#create predicted data
+pX <- expand.grid(
+  cur_structure_condition_c=c(-0.5,0.5),
+  match_condition_c=c(-0.5,0.5),
+  block_c=c(-0.5,0.5),
+  block_trial_number_c=seq(-23.5,23.5,by=1))
+predictions <- predictSE(m,pX,re.form=NA, type="response")
+pX$fit <- predictions$fit
+pX$se.fit <- predictions$se.fit
+
+pX <- pX %>%
+  mutate(
+    block_trial_number = block_trial_number_c+24.5,
+    cur_structure_condition = case_when(
+      cur_structure_condition_c==0.5 ~ "emotion",
+      cur_structure_condition_c==-0.5 ~ "model"
+    ),
+    match_condition=case_when(
+      match_condition_c==0.5 ~ "match",
+      match_condition_c==-0.5 ~ "mismatch"
+    ),
+    block_name = case_when(
+      block_c==0.5 ~ "generalization block",
+      block_c==-0.5~"learning block"
+    )
+  ) %>%
+  mutate(
+    block_name=factor(block_name,levels=c("learning block","generalization block"))
+  )
+
+d <- d %>%
+  mutate(
+    block_name = case_when(
+      block==1 ~ "learning block",
+      block==2 ~ "generalization block")
+  ) %>%
+  mutate(
+    block_name=factor(block_name,levels=c("learning block","generalization block"))
+  )
+
+
+p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.factor(max_reward_choice),color=cur_structure_condition))+
+      geom_point(size = 0.5, alpha=0.2,shape=19,position  = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==-0.5),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==0.5),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+  geom_hline(yintercept=0.25*4+1,linetype="dashed")+
+      geom_smooth(data=pX,aes(y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1,fill=cur_structure_condition),stat="identity")+
+      theme_classic(base_size=18)+
+      ylab("Probability of \nreward-maximizing choice")+
+      scale_color_brewer(
+        palette="Set1",
+        name="Structure Condition",
+        breaks=c(0.5,-0.5),
+        labels=c("Emotion","Model"))+
+      scale_fill_brewer(
+        palette="Set1",
+        name="Structure Condition",
+        breaks=c(0.5,-0.5),
+        labels=c("Emotion","Model"))+
+      scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
+      xlab("Block Trial Number")+
+  facet_wrap(~match_condition+block_name)+
+      theme(legend.position=c(0.4,0.4))
+p
+
+ggsave(here(figure_path,"overall_reward_maximizing.png"),width=9,height=6)
+```
+
+#### Plot Generalization Only
+
+```{r}
+#create predicted data
+pX <- expand.grid(
+  cur_structure_condition_c=c(-0.5,0.5),
+  match_condition_c=c(-0.5,0.5),
+  block_c=c(-0.5,0.5),
+  block_trial_number_c=seq(-23.5,23.5,by=1))
+predictions <- predictSE(m,pX,re.form=NA, type="response")
+pX$fit <- predictions$fit
+pX$se.fit <- predictions$se.fit
+
+pX <- pX %>%
+  mutate(
+    block_trial_number = block_trial_number_c+24.5,
+    cur_structure_condition = case_when(
+      cur_structure_condition_c==0.5 ~ "emotion",
+      cur_structure_condition_c==-0.5 ~ "model"
+    ),
+    match_condition=case_when(
+      match_condition_c==0.5 ~ "match",
+      match_condition_c==-0.5 ~ "mismatch"
+    ),
+    block_name = case_when(
+      block_c==0.5 ~ "generalization block",
+      block_c==-0.5~"learning block"
+    )
+  ) %>%
+  mutate(
+    block_name=factor(block_name,levels=c("learning block","generalization block"))
+  )
+
+d <- d %>%
+  mutate(
+    block_name = case_when(
+      block==1 ~ "learning block",
+      block==2 ~ "generalization block")
+  ) %>%
+  mutate(
+    block_name=factor(block_name,levels=c("learning block","generalization block"))
+  )
+
+
+p <- ggplot(subset(d,!is.na(block_trial_number)&block_name=="generalization block"),aes(block_trial_number,as.factor(max_reward_choice),color=cur_structure_condition))+
+      geom_point(size = 0.5, alpha=0.02,shape=19,position  = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==-0.5&block_name=="generalization block"),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==0.5&block_name=="generalization block"),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+  geom_hline(yintercept=0.25*4+1,linetype="dashed")+
+      geom_smooth(data=filter(pX,block_name=="generalization block"),aes(y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1,fill=cur_structure_condition),stat="identity")+
+      theme_classic(base_size=18)+
+      ylab("Probability of \nreward-maximizing choice")+
+      scale_color_brewer(
+        palette="Set1",
+        name="Structure Condition",
+        breaks=c(0.5,-0.5),
+        labels=c("Emotion","Model"))+
+      scale_fill_brewer(
+        palette="Set1",
+        name="Structure Condition",
+        breaks=c(0.5,-0.5),
+        labels=c("Emotion","Model"))+
+      scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
+      xlab("Block Trial Number")+
+  facet_wrap(~match_condition)+
+      theme(legend.position=c(0.4,0.4))
+p
+
+ggsave(here(figure_path,"generalization_reward_maximizing.png"),width=9,height=6)
+```
+
