@@ -1,0 +1,414 @@
+---
+title: "Emogo Combined Analysis"
+author: "Rista Plate via Martin Zettersten"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+
+```{r setup, include=FALSE}
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(viridisLite)
+library(lme4)
+library(ggstance)
+library(cowplot)
+#library(AICcmodavg)
+```
+
+# Data Processing
+
+## Exclusions
+
+N = 534 to start (202 personality, 332 psychopathology)
+
+Exclusions
+N = 2 (no worker Id)
+N = 14 (duplicate worker Ids)
+N = 2 (chose a single location >80% of trials) *these 2 subject also failed the attn check and are include in the N = 9 below
+N = 9 (failed attention check) 
+
+## Read in data
+
+Removed 20 participants w/duplicate data
+NOTE: will have to remove participants in the Qualtrics surveys as well
+
+```{r}
+d_pers <- read_csv("data/emogo-spark-personality-alldata.csv") %>%
+  mutate(task_version = "spark-personality") %>%
+  filter(subject != "p769897") %>% #duplicate entry
+  drop_na(workerId) # na worker id
+
+#length(unique(d_pers$subject))
+#length(unique(d_psych$subject))
+#length(unique(d$subject))
+
+d_psych <- read_csv("data/emogo-spark-psychopathology-alldata.csv") %>%
+  mutate(task_version = "spark-psychopathology") %>%
+  filter((!subject %in% c("p792394", "p414210", "p608500", "p363845",
+                          "p363974", "p108404", "p282716", "p485738",
+                          "p398983", "p482177", "p306406", "p279981",
+                          "p840071"))) %>% #duplicate entry
+  drop_na(workerId) # na worker id
+
+d_all <- d_pers %>%
+  full_join(d_psych)
+
+d <- d_all %>%
+  filter(
+    (trial_type %in% c("explore-choice"))
+  )
+
+```
+
+
+### Check duplicate subjects
+
+```{r, eval = FALSE}
+length(unique(d_all$subject))
+length(unique(d_all$workerId))
+
+length(unique(d_pers$subject))
+length(unique(d_pers$workerId))
+
+length(unique(d_psych$subject))
+length(unique(d_psych$workerId))
+
+d_all_filt <- d_all %>%
+  filter(
+    (trial_type %in% c("preload"))
+    )
+
+d_duplicates <- d_all_filt %>%
+  subset(duplicated(workerId)) %>%
+  select(subject, workerId, file_name)
+
+ d_psych_dups <- d_all_filt %>%
+   subset(workerId %in% d_duplicates$workerId) %>%
+   select(subject, workerId, file_name)
+
+# visually compared dates/times. The following are duplicate ids
+
+
+# length(unique(d_psych_test$subject))
+# length(unique(d_psych_test$workerId))
+# 
+# #visually compared dates/times. The following are duplicate ids
+# 
+# Personality: exclude p769897 (duplicate workerId: TP_1JERVAMG07Y7Q7)
+#
+# Psychopathology (OLD)
+# # p1993 - TP_18UD8G7AT9WKYZ2
+# # p792394 - TP_18UD8G7AT9WKYZ2
+# # p414210 - TP_1A7Y79U57YWAC02
+# # p608500 - TP_1DGSZBVP5KEB8Z2
+# # p968753 - TP_1EQN06AP5GYO502
+# # p363845 - TP_1EQN06AP5GYO502
+# # p344585 - TP_1GAJD3ZIQ8ITU02
+# # p363974 - TP_1GAJD3ZIQ8ITU02
+# # p39049 - TP_1HD04G2P6XY05Y2
+# # p108404 - TP_1HD04G2P6XY05Y2
+# # p965179 - TP_1M3YATU33NPAQ02
+# # p282716 - TP_1M3YATU33NPAQ02
+# # p485738 - TP_1NVOLYSEYP5PTZ2
+# # p398983 - TP_1PW6BAC12I9JA7
+# # p482177 - TP_1RTGYWL0YO72GY2
+# # p306406 - TP_1VO2ZSDXEJGS67
+# # p279981 - TP_1WJS9X5ABBKXMZ2
+# # p840071 - TP_1Z0XKBI664P71Z2
+
+```
+
+## Adding some useful columns
+
+Adding columns to characterize participant choices.
+
+```{r}
+d <- d %>%
+  mutate(
+    trial_number = case_when(
+      trial_index<8 ~ trial_index,
+      trial_index<199 ~ 7+(trial_index-7)/2,
+      TRUE ~ trial_index-96
+    )
+  ) %>%
+  relocate(trial_number,.after=trial_index) %>%
+  mutate(
+    test_trial_number = case_when(
+      trial_number<7 ~ NA_real_,
+      trial_number<103 ~ trial_number-6,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  relocate(test_trial_number,.after=trial_number) %>%
+  mutate(
+    block_trial_number = case_when(
+      test_trial_number < 49 ~ test_trial_number,
+      TRUE ~ test_trial_number - 48),
+    block_trial_number_c = block_trial_number - 24.5
+  ) %>%
+  relocate(block_trial_number,.after=test_trial_number) %>%
+  relocate(block_trial_number_c,.after=block_trial_number) %>%
+  mutate(
+    explore_block = case_when(
+      test_trial_number<9 ~ 1,
+      test_trial_number<17 ~ 2,
+      test_trial_number<25 ~ 3,
+      test_trial_number<33 ~ 4,
+      test_trial_number < 41 ~ 5,
+      test_trial_number < 49 ~ 6,
+      test_trial_number < 57 ~ 7,
+      test_trial_number<65 ~ 8,
+      test_trial_number<73 ~ 9,
+      test_trial_number<81 ~ 10,
+      test_trial_number <89 ~ 11,
+      test_trial_number <97 ~ 12,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    max_reward_choice = case_when(
+      reward_score_unadjusted ==8 ~ 1,
+      !is.na(test_trial_number) ~ 0,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  mutate(
+    cur_structure_condition=case_when(
+      test_trial_number < 49 ~ structure_condition,
+      !is.na(test_trial_number) & match_condition == "match" ~ structure_condition,
+       test_trial_number >= 49 & structure_condition == "emotion" ~ "model",
+      test_trial_number >= 49 & structure_condition == "model" ~ "emotion"
+    )
+  ) %>%
+  mutate(block = case_when(
+      test_trial_number < 49 ~ 1,
+      test_trial_number >= 49 ~ 2,
+      TRUE ~ NA_real_
+    ))
+
+#recenter vars
+d <- d %>%
+  mutate(
+    structure_condition_c = case_when(
+      structure_condition == "model" ~ -0.5,
+      structure_condition == "emotion" ~ 0.5),
+    cur_structure_condition_c = case_when(
+      cur_structure_condition == "model" ~ -0.5,
+      cur_structure_condition == "emotion" ~ 0.5),
+    match_condition_c = case_when(
+      match_condition == "match" ~ 0.5,
+      match_condition == "mismatch" ~ -0.5
+    ),
+    cur_structure_condition_model = case_when(
+      cur_structure_condition == "model" ~ 0,
+      cur_structure_condition == "emotion" ~ 1),
+    cur_structure_condition_emotion = case_when(
+      cur_structure_condition == "model" ~ -1,
+      cur_structure_condition == "emotion" ~ 0),
+    match_condition_match = case_when(
+      match_condition == "match" ~ 0,
+      match_condition == "mismatch" ~ -1
+    ),
+    match_condition_mismatch = case_when(
+      match_condition == "match" ~ 1,
+      match_condition == "mismatch" ~ 0
+    ),
+    block_c = case_when(
+      test_trial_number < 49 ~ -0.5,
+      TRUE ~ 0.5
+    ),
+    block_learn = case_when(
+      block==1 ~ 0,
+      block==2 ~ 1
+    ),
+    block_gen = case_when(
+      block==1 ~ -1,
+      block==2 ~ 0
+    )
+  )
+```
+
+## Check data {.tabset}
+
+
+### Open ended responses
+
+```{r}
+open_resps <- d_all %>%
+  filter(grepl("patterns",response)) %>%
+  select(subject, workerId, structure_condition, match_condition ,response) %>% 
+  extract(response, into = c("patterns", "strategy", "comments"),
+          regex = "patterns\":\"(.*)\",\"strategy\":\"(.*)\",\"comments\":\"(.*)") 
+
+#write_csv(open_resps, "emogo_combined_open_resps_2023.05.09.csv")
+```
+
+
+### Attention check
+
+```{r}
+attention_check <- d_all %>%
+  filter(trial_index %in% c(4,5)) %>%
+  mutate(
+    attention_check_correct_choice = case_when(
+      trial_index == 4 ~ "stimuli/horse.jpg",
+      trial_index == 5 ~ "stimuli/hammer.jpg"
+    ),
+    check_correct = ifelse(attention_check_correct_choice==choiceImage,1,0)
+  ) %>%
+  group_by(subject) %>%
+  summarize(
+    N=n(),
+    avg_correct = mean(check_correct)
+  )
+
+passed_attention_check <- attention_check %>%
+  filter(avg_correct ==1) %>%
+  pull(subject)
+```
+
+### Total time
+
+```{r}
+total_time <- d_all %>%
+  filter(trial_index==206) %>%
+  select(subject,time_elapsed) %>%
+  distinct() %>%
+  mutate(time_mins = time_elapsed/1000/60)
+
+#Minumum time
+min(total_time$time_mins)
+
+#Any subjects with times under 4 minutes?
+subjects_too_fast <- total_time %>%
+  filter(time_mins<4)
+
+subjects_too_fast %>%
+  pull(subject)
+```
+
+### Check image location selection
+
+```{r}
+percent_location_selections <- d %>%
+  filter(!is.na(test_trial_number)) %>%
+  group_by(subject,choiceLocation) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n))
+
+#any frequencies above 80%?
+subjects_same_location_exclusion <- percent_location_selections %>%
+  filter(freq>0.8) 
+
+subjects_same_location_exclusion %>%
+  distinct(subject) %>%
+  pull(subject)
+```
+
+### Reward ranks
+
+```{r, eval = FALSE}
+reward_rank <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(test_trial_number==96) %>%
+  select(subject,structure_condition,match_condition,score_after_trial)
+
+median_score <- median(reward_rank$score_after_trial)
+
+ggplot(reward_rank,aes(x=score_after_trial))+
+  geom_histogram()+
+  geom_vline(xintercept = median_score)
+
+ggplot(reward_rank,aes(x=score_after_trial,color=match_condition))+
+  geom_density()+
+  facet_wrap(~structure_condition)
+
+subjects_top_50 <- reward_rank %>%
+  filter(score_after_trial>=median_score) %>%
+  select(subject)
+
+#write_csv(subjects_top_50,here("data-analysis","data","v1","processed","subjects_top_50.csv"))
+
+conditions_top_50 <- reward_rank %>%
+  filter(subject %in% subjects_top_50$subject) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally()
+conditions_top_50
+```
+
+### Final tally
+
+```{r}
+#exclude any participants who meet exclusion criteria
+d <- d %>%
+  filter(subject %in% passed_attention_check) %>%
+  filter(!(subject %in% subjects_same_location_exclusion)) %>%
+  filter(!(subject %in% subjects_too_fast))
+
+d %>%
+  distinct(subject,structure_condition,match_condition) %>%
+  group_by(structure_condition,match_condition) %>%
+  tally() 
+
+length(unique(d$subject))
+
+d_sub <- d %>%
+  drop_na(test_trial_number) %>%
+  select(subject, workerId, structure_condition:seed, task_version, test_trial_number:block_trial_number_c, rt:rewards_unadjusted, n, explore_block:block_gen)
+
+
+#write_csv(d_sub, "emogo_pers+psych_2023.05.10.csv")
+
+```
+
+# Further processing
+
+```{r}
+d <- read_csv("emogo_pers+psych_2023.05.10.csv") %>%
+  mutate(choiceValence = ifelse(choiceEmotion == "CC" | choiceEmotion == "HE" | choiceEmotion == "HO" | choiceEmotion == "SUR", "positive emotions (calm, happy, exuberent, surprise)", "negative emotions (anger, fear, disgust, sad")) %>%
+  mutate(choiceGender = ifelse(grepl('M',choiceModel), "male", "female")) %>%
+  mutate(choiceRace = ifelse(grepl('A',choiceModel),"Asian",
+                             ifelse(grepl('B',choiceModel),"Black",
+                                    ifelse(grepl('H',choiceModel),"Hispanic", "White")))) %>%
+  mutate(choiceValence_C = ifelse(choiceValence ==  "positive emotions (calm, happy, exuberent, surprise)", .5, -.5))%>% 
+  separate(rewards_unadjusted, into = c("image_1_rew", "image_2_rew","image_3_rew","image_4_rew"), sep = ",", convert = TRUE, remove = FALSE)%>% 
+  separate(emotions, into = c("image_1_emo", "image_2_emo","image_3_emo","image_4_emo"), sep = '","', convert = TRUE, remove = FALSE) %>%
+  separate(image_1_emo, into = c("junk", "image_1_emo"), sep = '"', convert = TRUE) %>%
+  select(-junk) %>%
+  separate(image_4_emo, into = c("image_4_emo", "junk2"), sep = '"', convert = TRUE) %>%
+  select(-junk2)%>%
+  separate(image_1_rew, into = c("junk", "image_1_rew"), sep = 1, convert = TRUE) %>%
+  select(-junk) %>%
+  separate(image_4_rew, into = c("image_4_rew", "junk2"), sep = -1, convert = TRUE) %>%
+  select(-junk2) %>%
+  mutate(rew_8_emo = ifelse(cur_structure_condition == "model", "model",
+                          ifelse(cur_structure_condition == "emotion" & image_1_rew == 8, image_1_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_2_rew == 8, image_2_emo,
+                          ifelse(cur_structure_condition == "emotion" & image_3_rew == 8, image_3_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_4_rew == 8, image_4_emo, "OTHER"))))),
+         rew_6_emo = ifelse(cur_structure_condition == "model", "model",
+                          ifelse(cur_structure_condition == "emotion" & image_1_rew == 6, image_1_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_2_rew == 6, image_2_emo,
+                          ifelse(cur_structure_condition == "emotion" & image_3_rew == 6, image_3_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_4_rew == 6, image_4_emo, "OTHER"))))),
+         rew_4_emo = ifelse(cur_structure_condition == "model", "model",
+                          ifelse(cur_structure_condition == "emotion" & image_1_rew == 4, image_1_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_2_rew == 4, image_2_emo,
+                          ifelse(cur_structure_condition == "emotion" & image_3_rew == 4, image_3_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_4_rew == 4, image_4_emo, "OTHER"))))),
+         rew_2_emo = ifelse(cur_structure_condition == "model", "model",
+                          ifelse(cur_structure_condition == "emotion" & image_1_rew == 2, image_1_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_2_rew == 2, image_2_emo,
+                          ifelse(cur_structure_condition == "emotion" & image_3_rew == 2, image_3_emo, 
+                          ifelse(cur_structure_condition == "emotion" & image_4_rew == 2, image_4_emo, "OTHER"))))))
+
+#write_csv(d, "emogo_pers+psych_2023.05.10_inclEmoCoding.csv")
+```
+
