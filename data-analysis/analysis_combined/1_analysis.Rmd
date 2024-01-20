@@ -266,7 +266,7 @@ d %>%
 
 ```{r, cache=TRUE, eval=TRUE}
 m_learn <- glmer(max_reward_choice ~ cur_structure_condition_c*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
-summary(m)
+summary(m_learn)
 confint(m_learn, method="Wald")
 ```
 
@@ -390,7 +390,7 @@ d_learning <- d_learning %>%
     cur_structure_condition == "emotion" & reward_maximizing_emotion=='SC' ~ "sad",
     cur_structure_condition == "emotion" & reward_maximizing_emotion=='SUR' ~ "surprise",
     TRUE ~ NA)) %>%
-  mutate(overall_reward_maximizing_emotion_incl_model = ifelse(d_graph$cur_structure_condition == "model", "model", overall_reward_maximizing_emotion_name)) %>%
+  mutate(overall_reward_maximizing_emotion_incl_model = ifelse(cur_structure_condition == "model", "model", overall_reward_maximizing_emotion_name)) %>%
   mutate(rewEmoValence = ifelse(overall_reward_maximizing_emotion_incl_model == "model", "model",
          ifelse(overall_reward_maximizing_emotion_name == "calm" | overall_reward_maximizing_emotion_name == "exuberant" | overall_reward_maximizing_emotion_name == "happy" | overall_reward_maximizing_emotion_name == "surprise", "positive emotions (calm, happy, exuberant, surprise)", "negative emotions (anger, fear, disgust, sad)"))) %>%
   mutate(rewEmoHAPPY_EX = ifelse(overall_reward_maximizing_emotion_incl_model == "model", "model",
@@ -541,7 +541,6 @@ d <- d %>%
   mutate(
     block_name=factor(block_name,levels=c("learning block","generalization block"))
   )
-
 
 p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.factor(max_reward_choice),color=cur_structure_condition))+
       geom_point(size = 0.5, alpha=0.2,shape=19,position  = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
