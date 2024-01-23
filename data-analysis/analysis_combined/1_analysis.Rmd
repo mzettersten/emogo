@@ -314,23 +314,27 @@ pX <- pX %>%
 
 p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.factor(max_reward_choice),color=cur_structure_condition,fill=cur_structure_condition))+
       geom_point(size = 0.5, alpha=0.02,shape=19,position  = position_jitterdodge(jitter.width = 0.05,jitter.height = 0.5,dodge.width = 0.2,seed = 1))+
-      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==-0.5),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
-      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==0.5),aes(fill=cur_structure_condition),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==-0.5),position = position_nudge(x = 0, y = .3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
+      geom_violinh(data=subset(d,!is.na(block_trial_number)&cur_structure_condition_c==0.5),position = position_nudge(x = 0, y = -.3 ),scale="count",width=0.4,alpha=0.3,color=NA)+
   geom_hline(yintercept=0.25*4+1,linetype="dashed")+
-      geom_smooth(data=pX,aes(y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1,fill=cur_structure_condition),stat="identity")+
+      geom_smooth(data=pX,aes(y=fit*4+1,ymax=(fit+se.fit)*4+1,ymin=(fit-se.fit)*4+1),stat="identity")+
       theme_classic(base_size=18)+
       ylab("Probability of \nreward-maximizing choice")+
       scale_color_brewer(
         palette="Set1",
         name="Structure Condition",
-        breaks=c(0.5,-0.5),
-        labels=c("Emotion","Model"))+
+        breaks=c("model","emotion"),
+        #direction=-1,
+        labels=c("Model","Emotion"),
+        aesthetics=c("color"))+
       scale_fill_brewer(
         palette="Set1",
         name="Structure Condition",
-        breaks=c(0.5,-0.5),
-        labels=c("Emotion","Model"))+
+        breaks=c("model","emotion"),
+        #direction=-1,
+        labels=c("Model","Emotion"))+
       scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
+  theme(legend.position=c(0.3,0.65),legend.title=element_text(size=16),legend.text=element_text(size=14))+
       xlab("Block Trial Number")
 p
 
