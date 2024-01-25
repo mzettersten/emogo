@@ -21,6 +21,7 @@ library(ggstance)
 library(cowplot)
 library(AICcmodavg)
 library(jsonlite)
+library(patchwork)
 
 
 figure_path <- here("data-analysis","analysis_combined","figures")
@@ -447,17 +448,26 @@ d_learning_trialwise_by_emotion_summary <- d_learning %>%
     sd_choice=sd(max_reward_choice),
     se_choice=sd_choice/sqrt(N),
     ci=qt(0.975, N-1)*sd_choice/sqrt(N),
-  )
+  ) %>%
+  group_by(overall_reward_maximizing_emotion_incl_model,structure_condition) %>%
+  mutate(
+    overall_average = mean(mean_choice)
+  ) %>%
+  ungroup() %>%
+  mutate(overall_reward_maximizing_emotion_incl_model=fct_reorder(overall_reward_maximizing_emotion_incl_model,overall_average))
 
-ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward_maximizing_emotion_incl_model))+
+p2 <- ggplot(filter(d_learning_trialwise_by_emotion_summary,overall_reward_maximizing_emotion_incl_model!="model"),aes(test_trial_number,mean_choice,color = overall_reward_maximizing_emotion_incl_model))+
   #geom_jitter(height = .005, alpha = .05)+
-  geom_point(data=d_learning_trialwise_by_emotion_summary,aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_point(aes(y=mean_choice),position=position_dodge(width=.9))+
+  geom_errorbar(aes(y=mean_choice,ymin=mean_choice-se_choice,ymax=mean_choice+se_choice),position=position_dodge(width=.9),width=0,alpha=0.5)+
+  geom_hline(yintercept=0.25, linetype="dashed")+
   geom_smooth(method = "loess")+
   xlab("Trial Number")+
   ylab("Chose Best Option")+
-  facet_grid(~ overall_reward_maximizing_emotion_incl_model)+
-  theme_bw()+
+  facet_wrap(~ overall_reward_maximizing_emotion_incl_model,ncol=4)+
   #scale_color_manual(name="Structure Condition")+
+  scale_color_viridis_d()+
+  theme_classic(base_size=18)+
   theme(panel.border = element_blank(),
   panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
@@ -466,7 +476,11 @@ ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward
   legend.key.size = unit(1, "cm")#,
   #text=element_text(size=16, family="Times")
   )+
-  ylim(0,1)
+  ylim(0,1)+
+  theme(axis.text =element_text(size=12))
+p+p2+plot_annotation(tag_levels = 'A')
+ggsave(here(figure_path,"learning_overall_with_emotions.png"),width=12,height=6)
+
 
 ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward_maximizing_emotion_incl_model))+
   #geom_jitter(height = .005, alpha = .05)+
@@ -488,7 +502,19 @@ ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward
   ylim(0,1)
 ```
 
+### Emotion Model
 
+```{r}
+d_learning <- d_learning %>%
+  ungroup() %>%
+  mutate(
+    overall_reward_maximizing_emotion_name_exuberant=fct_relevel(overall_reward_maximizing_emotion_name,"exuberant")
+  )
+m_emotion_learn <- glmer(max_reward_choice ~ overall_reward_maximizing_emotion_name_exuberant*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_learning, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_emotion_learn)
+confint(m_emotion_learn, method="Wald")
+Anova(m_emotion_learn,type="III")
+```
 
 ## Generalization
 
