@@ -14,3 +14,8 @@ lme4
 ggstance
 cowplot
 AICcmodavg
+lubridate
+jsonlite
+patchwork
+carData
+car

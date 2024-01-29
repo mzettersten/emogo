@@ -22,6 +22,7 @@ library(cowplot)
 library(AICcmodavg)
 library(jsonlite)
 library(patchwork)
+library(car)
 
 
 figure_path <- here("data-analysis","analysis_combined","figures")
@@ -166,6 +167,8 @@ d <- d %>%
       block==2 ~ 0
     )
   )
+
+
 ```
 
 ## Check data {.tabset}
@@ -326,14 +329,14 @@ p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.facto
         name="Structure Condition",
         breaks=c("model","emotion"),
         #direction=-1,
-        labels=c("Model","Emotion"),
+        labels=c("Individual","Emotion"),
         aesthetics=c("color"))+
       scale_fill_brewer(
         palette="Set1",
         name="Structure Condition",
         breaks=c("model","emotion"),
         #direction=-1,
-        labels=c("Model","Emotion"))+
+        labels=c("Individual","Emotion"))+
       scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
   theme(legend.position=c(0.3,0.65),legend.title=element_text(size=16),legend.text=element_text(size=14))+
       xlab("Block Trial Number")
@@ -374,6 +377,23 @@ reward_list <- reward_list %>%
 d <- d %>%
   left_join(reward_list)
 
+# add emotion names
+d <- d %>%
+  mutate(overall_reward_maximizing_emotion_name = case_when(
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='AO' ~ "angry",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='CC' ~ "calm",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='DO' ~ "disgust",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='FO' ~ "fear",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='HE' ~ "exuberant",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='HO' ~ "happy",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='SC' ~ "sad",
+    cur_structure_condition == "emotion" & reward_maximizing_emotion=='SUR' ~ "surprise",
+    TRUE ~ NA))
+
+#write data
+write_csv(d,here("data-analysis", "data","combined","emogo-combined-alldata-anonymized.csv"))
+
+
 
 d_learning <- d %>%
   filter(test_trial_number < 49)%>%
@@ -399,7 +419,7 @@ d_learning <- d_learning %>%
   mutate(rewEmoValence = ifelse(overall_reward_maximizing_emotion_incl_model == "model", "model",
          ifelse(overall_reward_maximizing_emotion_name == "calm" | overall_reward_maximizing_emotion_name == "exuberant" | overall_reward_maximizing_emotion_name == "happy" | overall_reward_maximizing_emotion_name == "surprise", "positive emotions (calm, happy, exuberant, surprise)", "negative emotions (anger, fear, disgust, sad)"))) %>%
   mutate(rewEmoHAPPY_EX = ifelse(overall_reward_maximizing_emotion_incl_model == "model", "model",
-                                 ifelse(overall_reward_maximizing_emotion_name == "exuberent" | overall_reward_maximizing_emotion_name == "happy" , "happy emotions (happy, exuberent)", "not happy emotions")) ) %>%
+                                 ifelse(overall_reward_maximizing_emotion_name == "exuberant" | overall_reward_maximizing_emotion_name == "happy" , "happy emotions (happy, exuberant)", "not happy emotions")) ) %>%
   mutate(
     valence_facetting = case_when(
       overall_reward_maximizing_emotion_name %in% c("calm","exuberant","happy","surprise") ~ "positive",
@@ -407,7 +427,15 @@ d_learning <- d_learning %>%
       cur_structure_condition == "model" ~ "model",
       TRUE ~ NA
     )
-  )
+  ) %>%
+  mutate(rewEmoHAPPY_EX_c=case_when(
+    rewEmoHAPPY_EX=="happy emotions (happy, exuberant)"~0.5,
+    rewEmoHAPPY_EX=="not happy emotions" ~ -0.5,
+    TRUE ~ NA),
+    rewEmoValence_c = case_when(
+      rewEmoValence == "positive emotions (calm, happy, exuberant, surprise)"~ 0.5,
+      rewEmoValence == "negative emotions (anger, fear, disgust, sad)" ~ -0.5,
+      TRUE ~ NA))
 
 length(unique(d_learning$subject))
 table(d_learning$overall_reward_maximizing_emotion_incl_model)
@@ -516,6 +544,54 @@ confint(m_emotion_learn, method="Wald")
 Anova(m_emotion_learn,type="III")
 ```
 
+### Valence Models
+
+No overall effect of (grouped) valence
+
+```{r}
+m_emotion_valence <- glmer(max_reward_choice ~ rewEmoValence_c*block_trial_number_c + (1|subject)+(1|choiceImage),data=d_learning, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_emotion_valence)
+confint(m_emotion_valence, method="Wald")
+```
+
+
+
+```{r}
+m_emotion_happyex <- glmer(max_reward_choice ~ rewEmoHAPPY_EX_c*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_learning, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+summary(m_emotion_happyex)
+confint(m_emotion_happyex, method="Wald")
+```
+
+```{r}
+valence_values <- read_csv(here("data-analysis", "data","combined","BRM-emot-submit.csv")) %>%
+  filter(Word %in% c("angry","disgusted","happy","sad","excited","surprised","calm","afraid")) %>%
+  select(Word, V.Mean.Sum,A.Mean.Sum) %>%
+  rename(
+    valence=V.Mean.Sum,
+    arousal=A.Mean.Sum
+  ) %>%
+  mutate(
+    short_emotion_name=case_when(
+      Word == "angry" ~ "AO",
+      Word == "disgusted" ~ "DO",
+      Word =="happy" ~ "HO",
+      Word=="excited" ~ "HE",
+      Word=="surprised" ~ "SUR",
+      Word=="afraid" ~ "FO",
+      Word == "calm" ~ "CC",
+      Word=="sad" ~ "SC"
+    )
+  ) %>%
+  mutate(valence_c=valence-mean(valence),
+         arousal_c=arousal-mean(arousal))
+d <- d %>%
+  left_join(valence_values,by=c("reward_maximizing_emotion"="short_emotion_name")) %>%
+  mutate()
+m_emotion_valence <- glmer(max_reward_choice ~ (valence_c+arousal_c)*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1&cur_structure_condition=="emotion"), family=binomial,glmerControl(optimizer="bobyqa"))
+summary(m_emotion_valence)
+```
+
+
 ## Generalization
 
 ### Full Model
@@ -583,17 +659,19 @@ p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.facto
       scale_color_brewer(
         palette="Set1",
         name="Structure Condition",
-        breaks=c(0.5,-0.5),
-        labels=c("Emotion","Model"))+
+        breaks=c("model","emotion"),
+        #direction=-1,
+        labels=c("Individual","Emotion"))+
       scale_fill_brewer(
         palette="Set1",
         name="Structure Condition",
-        breaks=c(0.5,-0.5),
-        labels=c("Emotion","Model"))+
+        breaks=c("model","emotion"),
+        #direction=-1,
+        labels=c("Individual","Emotion"))+
       scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
       xlab("Block Trial Number")+
   facet_wrap(~match_condition+block_name)+
-      theme(legend.position=c(0.4,0.4))
+      theme(legend.position=c(0.55,0.22), legend.title=element_text(size=10),legend.text=element_text(size=8),legend.background=element_blank())
 p
 
 ggsave(here(figure_path,"overall_reward_maximizing.png"),width=9,height=6)
@@ -654,17 +732,19 @@ p <- ggplot(subset(d,!is.na(block_trial_number)&block_name=="generalization bloc
       scale_color_brewer(
         palette="Set1",
         name="Structure Condition",
-        breaks=c(0.5,-0.5),
-        labels=c("Emotion","Model"))+
+        breaks=c("model","emotion"),
+        #direction=-1,
+        labels=c("Individual","Emotion"))+
       scale_fill_brewer(
         palette="Set1",
         name="Structure Condition",
-        breaks=c(0.5,-0.5),
-        labels=c("Emotion","Model"))+
+        breaks=c("model","emotion"),
+        #direction=-1,
+        labels=c("Individual","Emotion"))+
       scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
       xlab("Block Trial Number")+
   facet_wrap(~match_condition)+
-      theme(legend.position=c(0.4,0.4))
+      theme(legend.position=c(0.45,0.45), legend.background = element_blank())
 p
 
 ggsave(here(figure_path,"generalization_reward_maximizing.png"),width=9,height=6)
