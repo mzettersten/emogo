@@ -1574,7 +1574,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Emogo Combined Analysis</h1>
 <h4 class="author">Rista Plate via Martin Zettersten</h4>
-<h4 class="date">25 January, 2024</h4>
+<h4 class="date">29 January, 2024</h4>
 
 </div>
 
@@ -1866,8 +1866,6 @@ d %&gt;%
 ## 2 emotion             mismatch          181
 ## 3 model               match             178
 ## 4 model               mismatch          178</code></pre>
-<pre class="r"><code>#write data
-write_csv(d,here(&quot;data-analysis&quot;, &quot;data&quot;,&quot;combined&quot;,&quot;emogo-combined-alldata-anonymized.csv&quot;))</code></pre>
 </div>
 </div>
 <div id="learning-phase" class="section level2">
@@ -2034,7 +2032,25 @@ d &lt;- d %&gt;%
 <pre><code>## Joining with `by = join_by(block_trial_number, subject, hitId,
 ## structure_condition, match_condition, image1, image2, image3, image4,
 ## rewards_unadjusted, block)`</code></pre>
-<pre class="r"><code>d_learning &lt;- d %&gt;%
+<pre class="r"><code># add emotion names
+d &lt;- d %&gt;%
+  mutate(overall_reward_maximizing_emotion_name = case_when(
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;AO&#39; ~ &quot;angry&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;CC&#39; ~ &quot;calm&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;DO&#39; ~ &quot;disgust&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;FO&#39; ~ &quot;fear&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;HE&#39; ~ &quot;exuberant&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;HO&#39; ~ &quot;happy&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;SC&#39; ~ &quot;sad&quot;,
+    cur_structure_condition == &quot;emotion&quot; &amp; reward_maximizing_emotion==&#39;SUR&#39; ~ &quot;surprise&quot;,
+    TRUE ~ NA))
+
+#write data
+write_csv(d,here(&quot;data-analysis&quot;, &quot;data&quot;,&quot;combined&quot;,&quot;emogo-combined-alldata-anonymized.csv&quot;))
+
+
+
+d_learning &lt;- d %&gt;%
   filter(test_trial_number &lt; 49)%&gt;%
   mutate(choiceValence = ifelse(choiceEmotion == &quot;CC&quot; | choiceEmotion == &quot;HE&quot; | choiceEmotion == &quot;HO&quot; | choiceEmotion == &quot;SUR&quot;, &quot;positive emotions (calm, happy, exuberent, surprise)&quot;, &quot;negative emotions (anger, fear, disgust, sad)&quot;)) %&gt;%
   mutate(choiceGender = ifelse(grepl(&#39;M&#39;,choiceModel), &quot;male&quot;, &quot;female&quot;)) %&gt;%
@@ -2471,6 +2487,86 @@ summary(m_emotion_happyex)</code></pre>
 ## rewEmoHAPPY_EX_c                       0.11799610  1.48966407
 ## block_trial_number_c                   0.03631123  0.05445729
 ## rewEmoHAPPY_EX_c:block_trial_number_c -0.01351972  0.02248201</code></pre>
+<pre class="r"><code>valence_values &lt;- read_csv(here(&quot;data-analysis&quot;, &quot;data&quot;,&quot;combined&quot;,&quot;BRM-emot-submit.csv&quot;)) %&gt;%
+  filter(Word %in% c(&quot;angry&quot;,&quot;disgusted&quot;,&quot;happy&quot;,&quot;sad&quot;,&quot;excited&quot;,&quot;surprised&quot;,&quot;calm&quot;,&quot;afraid&quot;)) %&gt;%
+  select(Word, V.Mean.Sum,A.Mean.Sum) %&gt;%
+  rename(
+    valence=V.Mean.Sum,
+    arousal=A.Mean.Sum
+  ) %&gt;%
+  mutate(
+    short_emotion_name=case_when(
+      Word == &quot;angry&quot; ~ &quot;AO&quot;,
+      Word == &quot;disgusted&quot; ~ &quot;DO&quot;,
+      Word ==&quot;happy&quot; ~ &quot;HO&quot;,
+      Word==&quot;excited&quot; ~ &quot;HE&quot;,
+      Word==&quot;surprised&quot; ~ &quot;SUR&quot;,
+      Word==&quot;afraid&quot; ~ &quot;FO&quot;,
+      Word == &quot;calm&quot; ~ &quot;CC&quot;,
+      Word==&quot;sad&quot; ~ &quot;SC&quot;
+    )
+  ) %&gt;%
+  mutate(valence_c=valence-mean(valence),
+         arousal_c=arousal-mean(arousal))</code></pre>
+<pre><code>## New names:
+## Rows: 13915 Columns: 65
+## ── Column specification
+## ──────────────────────────────────────────────────────── Delimiter: &quot;,&quot; chr
+## (1): Word dbl (64): ...1, V.Mean.Sum, V.SD.Sum, V.Rat.Sum, A.Mean.Sum,
+## A.SD.Sum, A.Rat...
+## ℹ Use `spec()` to retrieve the full column specification for this data. ℹ
+## Specify the column types or set `show_col_types = FALSE` to quiet this message.
+## • `` -&gt; `...1`</code></pre>
+<pre class="r"><code>d &lt;- d %&gt;%
+  left_join(valence_values,by=c(&quot;reward_maximizing_emotion&quot;=&quot;short_emotion_name&quot;)) %&gt;%
+  mutate()
+m_emotion_valence &lt;- glmer(max_reward_choice ~ (valence_c+arousal_c)*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1&amp;cur_structure_condition==&quot;emotion&quot;), family=binomial,glmerControl(optimizer=&quot;bobyqa&quot;))</code></pre>
+<pre><code>## Warning in checkConv(attr(opt, &quot;derivs&quot;), opt$par, ctrl = control$checkConv, : Model is nearly unidentifiable: very large eigenvalue
+##  - Rescale variables?</code></pre>
+<pre class="r"><code>summary(m_emotion_valence)</code></pre>
+<pre><code>## Generalized linear mixed model fit by maximum likelihood (Laplace
+##   Approximation) [glmerMod]
+##  Family: binomial  ( logit )
+## Formula: max_reward_choice ~ (valence_c + arousal_c) * block_trial_number_c +  
+##     (1 + block_trial_number_c | subject) + (1 | choiceImage)
+##    Data: filter(d, block == 1 &amp; cur_structure_condition == &quot;emotion&quot;)
+## Control: glmerControl(optimizer = &quot;bobyqa&quot;)
+## 
+##      AIC      BIC   logLik deviance df.resid 
+##  10104.8  10182.5  -5042.4  10084.8    17462 
+## 
+## Scaled residuals: 
+##      Min       1Q   Median       3Q      Max 
+## -111.761   -0.148    0.004    0.229   62.085 
+## 
+## Random effects:
+##  Groups      Name                 Variance  Std.Dev. Corr
+##  subject     (Intercept)           8.029091 2.83357      
+##              block_trial_number_c  0.003953 0.06287  0.70
+##  choiceImage (Intercept)          17.713158 4.20870      
+## Number of obs: 17472, groups:  subject, 363; choiceImage, 250
+## 
+## Fixed effects:
+##                                 Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)                    -1.934511   0.319066  -6.063 1.34e-09 ***
+## valence_c                       0.071267   0.056646   1.258 0.208350    
+## arousal_c                       0.312808   0.086285   3.625 0.000289 ***
+## block_trial_number_c            0.043855   0.004176  10.502  &lt; 2e-16 ***
+## valence_c:block_trial_number_c  0.001222   0.001523   0.802 0.422392    
+## arousal_c:block_trial_number_c -0.001320   0.002347  -0.563 0.573747    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Correlation of Fixed Effects:
+##             (Intr) vlnc_c arsl_c blc___ v_:___
+## valence_c   -0.040                            
+## arousal_c    0.049  0.103                     
+## blck_trl_n_  0.274 -0.041  0.071              
+## vlnc_c:b___ -0.019  0.573  0.066 -0.064       
+## arsl_c:b___  0.036  0.069  0.556  0.110  0.073
+## optimizer (bobyqa) convergence code: 0 (OK)
+## Model is nearly unidentifiable: very large eigenvalue
+##  - Rescale variables?</code></pre>
 </div>
 </div>
 <div id="generalization" class="section level2">
