@@ -105,8 +105,6 @@ m_cosine <- glmer(max_reward_choice ~ block_trial_number_c*avg_reward_lemma_cosi
 summary(m_cosine)
 confint(m_cosine, method="Wald")
 
-d$cur
-
 m_cosine_int <- glmer(max_reward_choice ~ cur_structure_condition_emotion*block_trial_number_c*avg_reward_lemma_cosine_sim_c + (1+avg_reward_lemma_cosine_sim_c|subject)+(1|choiceImage),data=d, family=binomial,glmerControl(optimizer="bobyqa"))
 summary(m_cosine_int)
 confint(m_cosine_int, method="Wald")

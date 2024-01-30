@@ -554,8 +554,6 @@ summary(m_emotion_valence)
 confint(m_emotion_valence, method="Wald")
 ```
 
-
-
 ```{r}
 m_emotion_happyex <- glmer(max_reward_choice ~ rewEmoHAPPY_EX_c*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=d_learning, family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
 summary(m_emotion_happyex)
