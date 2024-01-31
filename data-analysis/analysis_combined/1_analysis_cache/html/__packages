@@ -8,13 +8,13 @@ purrr
 dplyr
 stringr
 forcats
+lubridate
 viridisLite
 Matrix
 lme4
 ggstance
 cowplot
 AICcmodavg
-lubridate
 jsonlite
 patchwork
 carData
