@@ -354,7 +354,7 @@ p_learning <- ggplot(subset(d,!is.na(block_trial_number)&block==1),aes(block_tri
         #direction=-1,
         labels=c("Individual","Emotion"))+
       scale_y_discrete(limits=c("0","0.25","0.5","0.75","1"))+
-  theme(legend.position=c(0.3,0.65),legend.title=element_text(size=16),legend.text=element_text(size=14))+
+  theme(legend.position=c(0.28,0.65),legend.title=element_text(size=16),legend.text=element_text(size=14))+
       xlab("Block Trial Number")
 p_learning
 
