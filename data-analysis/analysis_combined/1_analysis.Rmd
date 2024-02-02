@@ -359,6 +359,7 @@ p_learning <- ggplot(subset(d,!is.na(block_trial_number)&block==1),aes(block_tri
 p_learning
 
 ggsave(here(figure_path,"learning_reward_maximizing.png"),width=9,height=6)
+ggsave(here(figure_path,"learning_reward_maximizing.pdf"),width=9,height=6)
 ```
 
 
@@ -524,6 +525,7 @@ p2 <- ggplot(filter(d_learning_trialwise_by_emotion_summary,overall_reward_maxim
   theme(axis.text =element_text(size=12))
 p_learning+p2+plot_annotation(tag_levels = 'A')
 ggsave(here(figure_path,"learning_overall_with_emotions.png"),width=12,height=6)
+ggsave(here(figure_path,"learning_overall_with_emotions.pdf"),width=12,height=6)
 
 
 ggplot(d_learning,aes(test_trial_number,max_reward_choice,color = overall_reward_maximizing_emotion_incl_model))+
@@ -694,6 +696,7 @@ p <- ggplot(subset(d,!is.na(block_trial_number)),aes(block_trial_number,as.facto
 p
 
 ggsave(here(figure_path,"overall_reward_maximizing.png"),width=9,height=6)
+ggsave(here(figure_path,"overall_reward_maximizing.pdf"),width=9,height=6)
 ```
 
 #### Plot Generalization Only
@@ -767,5 +770,6 @@ p <- ggplot(subset(d,!is.na(block_trial_number)&block_name=="generalization bloc
 p
 
 ggsave(here(figure_path,"generalization_reward_maximizing.png"),width=9,height=6)
+ggsave(here(figure_path,"generalization_reward_maximizing.pdf"),width=9,height=6)
 ```
 
