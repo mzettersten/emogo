@@ -23,6 +23,8 @@ library(AICcmodavg)
 library(jsonlite)
 library(patchwork)
 library(car)
+library(jsonlite)
+library(janitor)
 
 
 figure_path <- here("data-analysis","analysis_combined","figures")
@@ -46,8 +48,24 @@ d_pers <- read_csv(here("data-analysis", "data","spark-personality","processed",
     subject = ifelse(subject=="p804911","p804911_2",subject)
   )
 
+#join in demographics
+d_pers_demo <- read_csv(here("data-analysis", "data","spark-personality","processed","emogo-spark-personality-demographics-data-anonymized.csv"))
+d_pers <- d_pers %>%
+  left_join(d_pers_demo)
+
 d_psych <- read_csv(here("data-analysis", "data","spark-psychopathology","processed","emogo-spark-psychopathology-alldata-anonymized.csv")) %>%
   mutate(task_version = "spark-psychopathology")
+
+#join in demographics
+d_psych_demo <- read_csv(here("data-analysis", "data","spark-psychopathology","processed","emogo-spark-psychopathology-demographics-data-anonymized.csv")) %>%
+  distinct() %>%
+  #remove some duplicates or matching issues/ missing worker Ids
+  filter(!(subject=="p875927" & is.na(Race))) %>%
+  filter(!(subject=="p901122" & Race == "White or Caucasian")) %>%
+  filter(subject!="p668856")
+  
+d_psych <- d_psych %>%
+  left_join(d_psych_demo)
 
 d <- d_v1 %>%
   full_join(d_v2) %>%
@@ -278,6 +296,80 @@ total_time <- d %>%
   mutate(time_mins = time_elapsed/1000/60)
 #There's a few participants who have completion times that are much much too long (>60 minutes). Not in our preregistered criteria, but should probably be removed
 ```
+
+### Demographics
+
+```{r}
+first_non_na <- function(x) {
+  # Return the first non-NA value
+  x[!is.na(x)][1]
+}
+
+#extract demographic information for version 1 and 2
+demo_data_v12 <- d %>%
+  filter(task_version %in% c("v1","v2")) %>%
+  filter(trial_type %in% c("survey-text","survey-multi-select","survey-multi-choice")) %>%
+  select(task_version,subject,trial_type,response) %>%
+  mutate(response_raw = map(response, ~ fromJSON(.) %>% as.data.frame())) %>%
+  select(-response,-trial_type) %>%
+  unnest(response_raw) %>%
+  select(-patterns,-strategy,-comments,-Q0) %>%
+  group_by(task_version,subject) %>%
+  summarise_all(first_non_na) %>%
+  mutate(age=as.numeric(age)) %>%
+  mutate(gender = tolower(trimws(gender))) %>%
+  mutate(gender = case_when(
+    gender == "m" ~ "male",
+    gender %in% c("woman", "f") ~ "female",
+    gender %in% c("","31","n/a") ~ NA_character_,
+    TRUE ~ gender
+  )) %>%
+  mutate(language = case_when(
+    language == "englishj" ~ "english",
+    TRUE ~ tolower(trimws(language))
+  )) %>%
+  #define L1 English for anyone who has a match to english in the language column
+  mutate(l1_english = ifelse(grepl("english",language,ignore.case = T),1,0)) 
+
+#extract demographic information for personality and psychopathology datasets
+demo_data_pers_psych <- d %>%
+  filter(task_version %in% c("spark-personality","spark-psychopathology")) %>%
+  select(task_version,subject,Race:Disability_5_TEXT) %>%
+  distinct() %>%
+  clean_names() %>%
+  mutate(gender=case_when(
+    current_gender %in% c("Man", "Man,Cisgender","Man,Gender fluid") ~ "male",
+    current_gender == "Cisgender" ~ tolower(sexat_birth),
+    current_gender %in% c("Woman","Woman,Cisgender") ~ "female",
+    current_gender %in% c("Non-binary/genderqueer","Transgender,Non-binary/genderqueer") ~ "non-binary",
+    current_gender %in% c("Prefer not to say/Don't know") ~ NA,
+    TRUE ~ current_gender
+  )) %>%
+  #fix likely typo with age
+  mutate(age=case_when(
+    age>120 ~ NA_real_,
+    TRUE ~ age
+  ))
+
+#combine
+demo_data <- demo_data_v12 %>%
+  bind_rows(demo_data_pers_psych)
+
+#basic demographics
+demo_data %>%
+  ungroup() %>%
+  summarize(
+    N=n(),
+    mean_age = mean(age,na.rm=T),
+    sd_age = sd(age,na.rm=T),
+    min_age = min(age,na.rm=T),
+    max_age = max(age,na.rm=T),
+    missing_age = sum(is.na(age))
+  ) 
+
+table(demo_data$gender,useNA = "always")
+```
+
 
 
 ## Learning Phase
