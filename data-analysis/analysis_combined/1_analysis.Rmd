@@ -865,3 +865,23 @@ ggsave(here(figure_path,"generalization_reward_maximizing.png"),width=9,height=6
 ggsave(here(figure_path,"generalization_reward_maximizing.pdf"),width=9,height=6)
 ```
 
+## Export Combined Dataset
+
+```{r}
+#combined with demographics
+d <- d %>%
+  left_join(demo_data)
+
+d_consolidated <- d %>%
+  filter(trial_type=="explore-choice") %>%
+  filter(!is.na(test_trial_number)) %>%
+  select(task_version, subject,structure_condition, cur_structure_condition, match_condition,test_trial_number,block,block_name, block_trial_number, time_elapsed, rt:choice_index,max_reward_choice,reward:rewards_unadjusted,reward1:arousal,age:disability_5_text) %>%
+  rename(reward_maximizing_emotion_name=Word,
+         first_structure_condition=structure_condition,
+         current_structure_condition=cur_structure_condition) %>%
+  select(-overall_reward_maximizing_emotion_name)
+
+#write data
+write_csv(d_consolidated,here("data-analysis", "data","combined","emogo-combined-alldata-anonymized-consolidated.csv"))
+```
+
