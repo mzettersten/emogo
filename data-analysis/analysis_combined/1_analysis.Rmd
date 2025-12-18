@@ -378,6 +378,7 @@ table(demo_data$gender,useNA = "always")
 
 ```{r, cache=TRUE, eval=TRUE}
 m_learn <- glmer(max_reward_choice ~ cur_structure_condition_c*block_trial_number_c + (1+block_trial_number_c|subject)+(1|choiceImage),data=filter(d,block==1), family=binomial,glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=100000)))
+#note 12/17/2025: the choiceImage random intercept is a questionable modeling decision and it would likely be better to make this (1|reward_maximizing_image) (created later) 
 summary(m_learn)
 confint(m_learn, method="Wald")
 ```
